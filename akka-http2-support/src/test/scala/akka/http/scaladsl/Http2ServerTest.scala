@@ -53,6 +53,7 @@ object Http2ServerTest extends App {
     case HttpRequest(GET, Uri(_, _, p, _, _), _, _, _) if p.toString.startsWith("/image2") ⇒
       HttpResponse(entity = HttpEntity(MediaTypes.`image/jpeg`, FileIO.fromPath(Paths.get("bigimage2.jpg"), 150000).mapAsync(1)(slowDown(2))))
     case HttpRequest(GET, Uri.Path("/crash"), _, _, _) ⇒ sys.error("BOOM!")
+    case HttpRequest(POST, Uri.Path("/echo"), _, e, _) ⇒ HttpResponse(entity = Await.result(e.toStrict(10.seconds), 1.seconds))
     case _: HttpRequest                                ⇒ HttpResponse(404, entity = "Unknown resource!")
   }
 

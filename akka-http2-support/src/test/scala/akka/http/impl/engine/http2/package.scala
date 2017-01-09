@@ -5,7 +5,7 @@ package akka.http.impl.engine
 
 import akka.util.ByteString
 
-package object http2 {
+package object http2 extends HexStringInterpolator {
   implicit class RichString(val str: String) extends AnyVal {
     def parseHexByteString: ByteString =
       ByteString(

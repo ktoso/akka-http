@@ -12,6 +12,8 @@ private[akka] object Http2Compliance {
 
   final class MissingHttpIdHeaderException extends IllegalArgumentException("Expected `Http2StreamIdHeader` header to be present but was missing!")
 
+  final class DecompressionFailedException extends IllegalArgumentException("Decompression failed!")
+
   final def missingHttpIdHeaderException = throw new MissingHttpIdHeaderException
 
   // require methods use `if` because `require` allocates

@@ -81,10 +81,11 @@ trait BufferedOutletSupport { logic: GraphStageLogic ⇒
     outlet.setHandler(this)
 
     final def push(element: T): Unit = pushWithTrigger(element, () ⇒ ())
-    final def pushWithTrigger(elem: T, trigger: () ⇒ Unit): Unit =
+    final def pushWithTrigger(elem: T, trigger: () ⇒ Unit): Unit = {
+      println(s"pushWithTrigger elem = ${elem}")
       if (outlet.canBePushed && buffer.isEmpty) doPush(ElementAndTrigger(elem, trigger))
       else buffer.addLast(ElementAndTrigger(elem, trigger))
-
+    }
     def tryFlush(): Unit =
       if (outlet.canBePushed && !buffer.isEmpty)
         doPush(buffer.pop())

@@ -23,8 +23,8 @@ import scala.util.control.NoStackTrace
 class H2SpecIntegrationSpec extends AkkaSpec(
   """
      akka {
-       loglevel = INFO
-       http.server.log-unencrypted-network-bytes = off
+       loglevel = DEBUG
+       http.server.log-unencrypted-network-bytes = 10000
         
        actor.serialize-creators = off
        actor.serialize-messages = off

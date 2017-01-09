@@ -39,16 +39,20 @@ object Http2Blueprint {
   // format: OFF
   def serverStack(): BidiFlow[HttpResponse, ByteString, ByteString, HttpRequest, NotUsed] = {
     httpLayer() atop
+    hpack() atop
     demux() atop
     headerProcessing() atop
     framing()
   }
   // format: ON
 
+  /**
+   * Parses (renders) incoming (outgoing) data bytes from (to) raw byte strings to (from) FrameEvents.
+   */
   def framing(): BidiFlow[FrameEvent, ByteString, ByteString, FrameEvent, NotUsed] =
     BidiFlow.fromFlows(
-      Flow[FrameEvent].map(FrameRenderer.render),
-      Flow[ByteString].via(new FrameParser(shouldReadPreface = true)))
+      Flow[FrameEvent].map(FrameRenderer.render).named("FrameRenderer.render"),
+      Flow[ByteString].via(new FrameParser(shouldReadPreface = true)).named("FrameParser"))
 
   /**
    * Runs hpack encoding and decoding. Incoming frames that are processed are HEADERS and CONTINUATION.
@@ -72,6 +76,13 @@ object Http2Blueprint {
     BidiFlow.fromGraph(new Http2ServerDemux)
 
   /**
+   * Creates substreams for every stream and manages stream state machines
+   * and handles priorization (TODO: later)
+   */
+  def hpack(): BidiFlow[HttpResponse, Http2SubStream, Http2SubStream, HttpRequest, NotUsed] =
+    BidiFlow.fromGraph(new HPackCompression)
+
+  /**
    * Translation between substream frames and Http messages (both directions)
    *
    * To make use of parallelism requests and responses need to be associated (other than by ordering), suggestion
@@ -79,10 +90,12 @@ object Http2Blueprint {
    * that must be reproduced in an HttpResponse. This can be done automatically for the bindAndHandleAsync API but for
    * bindAndHandle the user needs to take of this manually.
    */
-  def httpLayer(): BidiFlow[HttpResponse, NewHttp2SubStream, NewHttp2SubStream, HttpRequest, NotUsed] =
-    BidiFlow.fromFlows(
-      Flow[HttpResponse].map(ResponseRendering.renderResponse),
-      Flow[NewHttp2SubStream].map(RequestParsing.parseRequest))
+  def httpLayer(): BidiFlow[HttpResponse, Http2SubStream, Http2SubStream, HttpRequest, NotUsed] = {
+    val incomingRequests = Flow[Http2SubStream].via(new HttpRequestHeaderHpackDecompression)
+      .log(Logging.simpleName(getClass)) //FIXME replace with a proper `atop logging()`
+    val outgoingResponses = Flow[HttpResponse].via(new HttpResponseHeaderHpackCompression)
+    BidiFlow.fromFlows(outgoingResponses, incomingRequests)
+  }
 
   /**
    * Returns a flow that handles `parallelism` requests in parallel, automatically keeping track of the

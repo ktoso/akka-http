@@ -10,3 +10,8 @@ import akka.http.impl.engine.ws.InternalCustomHeader
 final case class Http2StreamIdHeader(streamId: Int) extends InternalCustomHeader("x-http2-stream-id") {
   override def value = String.valueOf(streamId)
 }
+// TODO should the streamId not be a Long? I may be mis-remembering the spec
+/** // @InternalAPI */
+private[http] final case object Http2ForceGoAway extends InternalCustomHeader("x-http2-decompression-failed-plz-go-away") { // FIXME names names names...
+  override def value = "<requesting GO_AWAY>"
+}
