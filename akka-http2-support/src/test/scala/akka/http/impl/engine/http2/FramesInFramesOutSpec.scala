@@ -17,7 +17,7 @@ import org.scalatest.concurrent.Eventually
 
 import scala.concurrent.duration._
 
-class DemuxDecompressionSpec extends AkkaSpec("akka.loglevel = DEBUG") with Eventually {
+class FramesInFramesOutSpec extends AkkaSpec with Eventually {
   implicit val mat = ActorMaterializer()
 
   val encodedGET = hex"82"
@@ -41,8 +41,13 @@ class DemuxDecompressionSpec extends AkkaSpec("akka.loglevel = DEBUG") with Even
       val headerBlock = hex"00 00 01 01 05 00 00 00 01 40"
       netIn.sendNext(HeadersFrame(1, endStream = true, endHeaders = true, headerBlock))
 
-      netOut.requestNext(GoAwayFrame(0, errorCode = ErrorCode.COMPRESSION_ERROR))
-      netOut.expectNoMsg(100.millis)
+      netOut.request(100)
+      val frame = netOut.expectNext
+      val goAway = frame.asInstanceOf[GoAwayFrame]
+      // not asserting the lastStreamId, it's allowed to be racy (and we actually only later store it, so it would be 0 here)
+      goAway.errorCode should ===(ErrorCode.COMPRESSION_ERROR)
+
+      netIn.sendComplete()
     }
   }
 
@@ -58,7 +63,6 @@ class DemuxDecompressionSpec extends AkkaSpec("akka.loglevel = DEBUG") with Even
 
   val user: Flow[HttpRequest, HttpResponse, NotUsed] =
     Flow[HttpRequest].map { req ⇒
-      println(s"req = ${req}")
       HttpResponse().addHeader(req.header[Http2StreamIdHeader].get)
     }
 

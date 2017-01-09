@@ -106,9 +106,10 @@ class Http2ServerDemux extends GraphStage[BidiShape[Http2SubStream, FrameEvent, 
       private var totalOutboundWindowLeft = Http2Protocol.InitialWindowSize
       private var streamLevelWindow = Http2Protocol.InitialWindowSize
 
-      def lastStreamId: Int =
-        incomingStreams.lastOption.map(_._1).getOrElse(0) // FIXME: this is a Map which has no order, so lastStreamId will be an arbitrary value
-
+      def lastStreamId: Int = {
+        // FIXME: this should be written somewhat more optimal
+        incomingStreams.keys.toSeq.sortBy(identity).lastOption.getOrElse(0)
+      }
       def pushGOAWAY(errorCode: ErrorCode = Http2Protocol.ErrorCode.PROTOCOL_ERROR): Unit = {
         // http://httpwg.org/specs/rfc7540.html#rfc.section.6.8
         val last = lastStreamId
