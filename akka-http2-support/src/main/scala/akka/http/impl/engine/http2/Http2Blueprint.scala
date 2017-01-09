@@ -5,21 +5,13 @@
 package akka.http.impl.engine.http2
 
 import akka.NotUsed
-import akka.event.Logging
 import akka.http.impl.engine.http2.hpack.{ HeaderCompression, HeaderDecompression }
-import akka.http.impl.engine.http2.rendering.HttpResponseHeaderHpackCompression
-import akka.http.impl.util.LogByteStringTools.logTLSBidiBySetting
-import akka.http.scaladsl.model.HttpRequest
-import akka.http.scaladsl.model.HttpResponse
+import akka.http.scaladsl.model.{ HttpRequest, HttpResponse }
 import akka.http.scaladsl.model.http2.Http2StreamIdHeader
-import akka.http.scaladsl.settings.ServerSettings
-import akka.stream.scaladsl.BidiFlow
-import akka.stream.scaladsl.Flow
-import akka.stream.scaladsl.Source
+import akka.stream.scaladsl.{ BidiFlow, Flow, Source }
 import akka.util.ByteString
 
-import scala.concurrent.ExecutionContext
-import scala.concurrent.Future
+import scala.concurrent.{ ExecutionContext, Future }
 
 /**
  * Represents one direction of an Http2 substream.
@@ -28,11 +20,7 @@ import scala.concurrent.Future
  * and passes the combined frame as `initialFrame` here. Following frames MUST be data frames (as per spec) -
  * and are directly related to the [[akka.http.scaladsl.model.HttpEntity]] offered by this stream.
  */
-private[http2] final case class Http2SubStream(initialFrame: HeadersFrame, frames: Source[DataFrame, _]) {
-  def streamId: Int = initialFrame.streamId
-}
-
-private[http2] final case class NewHttp2SubStream(initialHeaders: ParsedHeadersFrame, data: Source[ByteString, Any]) {
+private[http2] final case class Http2SubStream(initialHeaders: ParsedHeadersFrame, data: Source[ByteString, Any]) {
   def streamId: Int = initialHeaders.streamId
 }
 
@@ -94,7 +82,8 @@ object Http2Blueprint {
   def httpLayer(): BidiFlow[HttpResponse, Http2SubStream, Http2SubStream, HttpRequest, NotUsed] =
     BidiFlow.fromFlows(
       Flow[HttpResponse].map(ResponseRendering.renderResponse),
-      Flow[Http2SubStream].map(RequestParsing.parseRequest))
+      Flow[Http2SubStream].map(RequestParsing.parseRequest)
+    )
 
   /**
    * Returns a flow that handles `parallelism` requests in parallel, automatically keeping track of the

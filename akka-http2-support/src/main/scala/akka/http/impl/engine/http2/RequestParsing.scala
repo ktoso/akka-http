@@ -16,7 +16,7 @@ import scala.collection.immutable.VectorBuilder
  * INTERNAL API
  */
 private[http2] object RequestParsing {
-  def parseRequest(subStream: NewHttp2SubStream): HttpRequest = {
+  def parseRequest(subStream: Http2SubStream): HttpRequest = {
     @tailrec
     def rec(
       remainingHeaders: Seq[(String, String)],

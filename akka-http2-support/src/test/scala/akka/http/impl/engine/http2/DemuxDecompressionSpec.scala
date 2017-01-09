@@ -41,15 +41,17 @@ class DemuxDecompressionSpec extends AkkaSpec("akka.loglevel = DEBUG") with Even
       val headerBlock = hex"00 00 01 01 05 00 00 00 01 40"
       netIn.sendNext(HeadersFrame(1, endStream = true, endHeaders = true, headerBlock))
 
-      netOut.requestNext(GoAwayFrame(1, errorCode = ErrorCode.COMPRESSION_ERROR))
+      netOut.requestNext(GoAwayFrame(0, errorCode = ErrorCode.COMPRESSION_ERROR))
       netOut.expectNoMsg(100.millis)
     }
   }
 
+  // format: OFF
   val server: BidiFlow[HttpResponse, FrameEvent, FrameEvent, HttpRequest, NotUsed] =
     Http2Blueprint.httpLayer() atop
-      Http2Blueprint.hpack() atop
-      Http2Blueprint.demux()
+    Http2Blueprint.demux() atop
+    Http2Blueprint.headerProcessing()
+  // format: ON
 
   val net: Flow[FrameEvent, FrameEvent, (TestSubscriber.Probe[FrameEvent], TestPublisher.Probe[FrameEvent])] =
     Flow.fromSinkAndSourceMat(TestSink.probe[FrameEvent], TestSource.probe[FrameEvent])(Keep.both)

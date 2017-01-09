@@ -10,7 +10,7 @@ import akka.http.scaladsl.model.http2.Http2StreamIdHeader
 import scala.collection.immutable.VectorBuilder
 
 private[http2] object ResponseRendering {
-  def renderResponse(response: HttpResponse): NewHttp2SubStream = {
+  def renderResponse(response: HttpResponse): Http2SubStream = {
     def failBecauseOfMissingHeader: Nothing =
       // header is missing, shutting down because we will most likely otherwise miss a response and leak a substream
       // TODO: optionally a less drastic measure would be only resetting all the active substreams
@@ -24,10 +24,10 @@ private[http2] object ResponseRendering {
     //   that is included in an HTTP/1.1 status line.
     headerPairs += ":status" → response.status.intValue.toString
 
-    /*if (response.entity.contentType != ContentTypes.NoContentType)
+    if (response.entity.contentType != ContentTypes.NoContentType)
       headerPairs += "content-type" → response.entity.contentType.toString
 
-    response.entity.contentLengthOption.foreach(headerPairs += "content-length" → _.toString)*/
+    response.entity.contentLengthOption.foreach(headerPairs += "content-length" → _.toString)
 
     headerPairs ++=
       response.headers.collect {
@@ -36,7 +36,7 @@ private[http2] object ResponseRendering {
 
     val headers = ParsedHeadersFrame(streamId, endStream = response.entity.isKnownEmpty, headerPairs.result())
 
-    NewHttp2SubStream(
+    Http2SubStream(
       headers,
       response.entity.dataBytes
     )
