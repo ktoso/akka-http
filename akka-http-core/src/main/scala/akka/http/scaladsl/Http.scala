@@ -532,7 +532,7 @@ class HttpExt(private val config: Config)(implicit val system: ActorSystem) exte
     log:               LoggingAdapter         = system.log)(implicit fm: Materializer): Future[HttpResponse] =
     try {
       val gateway = sharedGateway(request, settings, connectionContext, log)
-      gateway(request)
+      gateway apply request
     } catch {
       case e: IllegalUriException ⇒ FastFuture.failed(e)
     }
