@@ -95,8 +95,8 @@ private[http] object HttpServerBluePrint {
     override val shape: FlowShape[RequestOutput, HttpRequest] = FlowShape.of(in, out)
 
     // INTERNAL API
-    def onRequestReceived(request: HttpRequest) = ()
-    
+    def onRequestReceived(mat: Materializer, request: HttpRequest) = () // FIXME
+
     override def createLogic(inheritedAttributes: Attributes) = new GraphStageLogic(shape) with InHandler with OutHandler {
       val remoteAddress = inheritedAttributes.get[HttpAttributes.RemoteAddress].flatMap(_.address)
       var downstreamPullWaiting = false
@@ -128,9 +128,9 @@ private[http] object HttpServerBluePrint {
 
           val entity = createEntity(entityCreator) withSizeLimit settings.parserSettings.maxContentLength
           val request = HttpRequest(effectiveMethod, uri, effectiveHeaders, entity, protocol)
-          onRequestReceived(request)
+          onRequestReceived(materializer, request)
           push(out, request)
-          
+
         case other ⇒
           throw new IllegalStateException(s"unexpected element of type ${other.getClass}")
       }
@@ -365,8 +365,6 @@ private[http] object HttpServerBluePrint {
 
     val shape = new BidiShape(requestParsingIn, requestPrepOut, httpResponseIn, responseCtxOut)
 
-    def requestReceived(request: )
-    
     def createLogic(effectiveAttributes: Attributes) = new GraphStageLogic(shape) {
       val pullHttpResponseIn = () ⇒ pull(httpResponseIn)
       var openRequests = immutable.Queue[RequestStart]()

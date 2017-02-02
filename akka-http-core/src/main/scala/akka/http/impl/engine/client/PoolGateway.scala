@@ -8,14 +8,14 @@ import java.util.concurrent.atomic.AtomicLong
 
 import akka.Done
 import akka.actor.ActorRef
-import akka.http.impl.engine.client.PoolGateway.{GatewayIdentifier, SharedGateway}
+import akka.http.impl.engine.client.PoolGateway.{ GatewayIdentifier, SharedGateway }
 import akka.http.impl.engine.client.PoolMasterActor._
 import akka.http.impl.settings.HostConnectionPoolSetup
 import akka.http.scaladsl.model.headers.RawHeader
-import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
+import akka.http.scaladsl.model.{ HttpRequest, HttpResponse }
 import akka.stream.Materializer
 
-import scala.concurrent.{Future, Promise}
+import scala.concurrent.{ Future, Promise }
 
 /**
  * Manages access to a host connection pool through the [[PoolMasterActor]]
