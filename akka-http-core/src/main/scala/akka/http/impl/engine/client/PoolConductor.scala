@@ -34,11 +34,11 @@ private object PoolConductor {
         slotEventIn.carbonCopy(),
         slotOuts.map(_.carbonCopy()))
 
-    override def copyFromPorts(inlets: immutable.Seq[Inlet[_]], outlets: immutable.Seq[Outlet[_]]): Shape =
-      Ports(
-        inlets.head.asInstanceOf[Inlet[RequestContext]],
-        inlets.last.asInstanceOf[Inlet[RawSlotEvent]],
-        outlets.asInstanceOf[immutable.Seq[Outlet[SlotCommand]]])
+    //    override def copyFromPorts(inlets: immutable.Seq[Inlet[_]], outlets: immutable.Seq[Outlet[_]]): Shape =
+    //      Ports(
+    //        inlets.head.asInstanceOf[Inlet[RequestContext]],
+    //        inlets.last.asInstanceOf[Inlet[RawSlotEvent]],
+    //        outlets.asInstanceOf[immutable.Seq[Outlet[SlotCommand]]])
   }
 
   final case class PoolSlotsSetting(minSlots: Int, maxSlots: Int) {

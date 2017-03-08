@@ -5,6 +5,7 @@
 package akka.http.impl.engine.parsing
 
 import akka.NotUsed
+import akka.http.impl.util.StreamUtils
 import akka.http.scaladsl.model._
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
@@ -68,7 +69,7 @@ private[http] object ParserOutput {
   final case class StrictEntityCreator(entity: HttpEntity.Strict) extends EntityCreator[ParserOutput, HttpEntity.Strict] {
     def apply(parts: Source[ParserOutput, NotUsed]) = {
       // We might need to drain stray empty tail streams which will be read by no one.
-      SubSource.kill(parts)
+      StreamUtils.kill(parts)
       entity
     }
   }

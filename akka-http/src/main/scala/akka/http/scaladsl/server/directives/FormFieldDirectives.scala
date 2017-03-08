@@ -143,7 +143,13 @@ object FormFieldDirectives extends FormFieldDirectives {
       case Success(x)                                  ⇒ provide(x)
       case Failure(Unmarshaller.NoContentException)    ⇒ reject(MissingFormFieldRejection(fieldName))
       case Failure(x: UnsupportedContentTypeException) ⇒ reject(UnsupportedRequestContentTypeRejection(x.supported))
-      case Failure(x)                                  ⇒ reject(MalformedFormFieldRejection(fieldName, x.getMessage.nullAsEmpty, Option(x.getCause)))
+      case Failure(x) ⇒
+        val ex = x.getCause match {
+          case null             ⇒ x
+          case cause: Throwable ⇒ cause
+        }
+        ex.printStackTrace()
+        reject(MalformedFormFieldRejection(fieldName, x.getMessage.nullAsEmpty, Option(ex)))
     }
 
     //////////////////// "regular" formField extraction ////////////////////

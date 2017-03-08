@@ -212,7 +212,7 @@ private[http] final class BodyPartParser(
                       emitFinalPartChunk: (List[HttpHeader], ContentType, ByteString) ⇒ Unit = {
                         (headers, ct, bytes) ⇒
                           emit(BodyPartStart(headers, { rest ⇒
-                            SubSource.kill(rest)
+                            StreamUtils.kill(rest)
                             HttpEntity.Strict(ct, bytes)
                           }))
                       })(input: ByteString, offset: Int): StateResult =

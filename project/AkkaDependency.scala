@@ -8,7 +8,7 @@ import Keys._
 
 object AkkaDependency {
   // Needs to be a URI like git://github.com/akka/akka.git#master or file:///xyz/akka
-  val akkaSourceDependencyUri = sys.props.getOrElse("akka.sources", "")
+  val akkaSourceDependencyUri: String = sys.props.getOrElse("akka.sources", "")
   val shouldUseSourceDependency = akkaSourceDependencyUri != ""
   val akkaRepository = {
     // as a little hacky side effect also disable aggregation of samples

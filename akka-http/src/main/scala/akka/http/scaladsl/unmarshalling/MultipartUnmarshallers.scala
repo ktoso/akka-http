@@ -13,6 +13,7 @@ import akka.http.scaladsl.model._
 import akka.http.scaladsl.settings.ParserSettings
 import akka.http.scaladsl.util.FastFuture
 import akka.stream.ActorMaterializerHelper
+import akka.http.impl.util.StreamUtils
 import akka.stream.impl.fusing.SubSource
 import akka.stream.scaladsl._
 
@@ -103,7 +104,7 @@ trait MultipartUnmarshallers {
                       case (Seq(BodyPartStart(headers, createEntity)), entityParts) ⇒
                         createBodyPart(createEntity(entityParts), headers)
                       case (Seq(ParseError(errorInfo)), rest) ⇒
-                        SubSource.kill(rest)
+                        StreamUtils.kill(rest)
                         throw ParsingException(errorInfo)
                     }
                     .concatSubstreams

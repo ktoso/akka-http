@@ -5,10 +5,13 @@
 package akka.http.impl.util
 
 import java.util.concurrent.atomic.{ AtomicBoolean, AtomicReference }
+
 import akka.NotUsed
+import akka.actor.ActorSystem
 import akka.stream._
 import akka.stream.impl.fusing.GraphStages.SimpleLinearGraphStage
-import akka.stream.impl.{ PublisherSink, SinkModule, SourceModule }
+import akka.stream.impl._
+import akka.stream.impl.fusing.GraphInterpreter
 import akka.stream.scaladsl._
 import akka.stream.stage._
 import akka.util.ByteString
@@ -20,7 +23,6 @@ import scala.concurrent.{ ExecutionContext, Future, Promise }
  * INTERNAL API
  */
 private[http] object StreamUtils {
-  import Attributes.none
 
   /**
    * Creates a transformer that will call `f` for each incoming ByteString and output its result. After the complete
@@ -44,6 +46,14 @@ private[http] object StreamUtils {
       }
 
       setHandlers(in, out, this)
+    }
+  }
+
+  /** USE WITH CAUTION: Drains (runs with Sink.ignore) a Source by locating the current GraphInterpreter, otherwise throws. */
+  def kill[T, M](s: Source[T, M]): Unit = {
+    GraphInterpreter.currentInterpreterOrNull match {
+      case null ⇒ throw new UnsupportedOperationException(s"Cannot drop Source of type ${s.getClass.getName}, not running in scope of a GraphInterpreter!")
+      case intp ⇒ s.runWith(Sink.ignore)(intp.subFusingMaterializer)
     }
   }
 
@@ -114,6 +124,7 @@ private[http] object StreamUtils {
           push(out, toPush)
           remaining = toKeep
         }
+
         setHandlers(in, out, WaitingForData)
 
         case object WaitingForData extends InHandler with OutHandler {
@@ -125,18 +136,22 @@ private[http] object StreamUtils {
               setHandlers(in, out, DeliveringData)
             }
           }
+
           override def onPull(): Unit = pull(in)
         }
 
         case object DeliveringData extends InHandler() with OutHandler {
           var finishing = false
+
           override def onPush(): Unit = throw new IllegalStateException("Not expecting data")
+
           override def onPull(): Unit = {
             splitAndPush(remaining)
             if (remaining.isEmpty) {
               if (finishing) completeStage() else setHandlers(in, out, WaitingForData)
             }
           }
+
           override def onUpstreamFinish(): Unit = if (remaining.isEmpty) completeStage() else finishing = true
         }
 
@@ -154,67 +169,6 @@ private[http] object StreamUtils {
         throw new IllegalStateException(errorMsg)
       elem
     }
-  }
-
-  def oneTimePublisherSink[In](cell: OneTimeWriteCell[Publisher[In]], name: String): Sink[In, Publisher[In]] =
-    new Sink[In, Publisher[In]](new OneTimePublisherSink(none, SinkShape(Inlet(name)), cell))
-  def oneTimeSubscriberSource[Out](cell: OneTimeWriteCell[Subscriber[Out]], name: String): Source[Out, Subscriber[Out]] =
-    new Source[Out, Subscriber[Out]](new OneTimeSubscriberSource(none, SourceShape(Outlet(name)), cell))
-
-  /** A copy of PublisherSink that allows access to the publisher through the cell but can only materialized once */
-  private class OneTimePublisherSink[In](attributes: Attributes, shape: SinkShape[In], cell: OneTimeWriteCell[Publisher[In]])
-    extends PublisherSink[In](attributes, shape) {
-    override def create(context: MaterializationContext): (AnyRef, Publisher[In]) = {
-      val results = super.create(context)
-      cell.set(results._2)
-      results
-    }
-    override protected def newInstance(shape: SinkShape[In]): SinkModule[In, Publisher[In]] =
-      new OneTimePublisherSink[In](attributes, shape, cell)
-
-    override def withAttributes(attr: Attributes): OneTimePublisherSink[In] =
-      new OneTimePublisherSink[In](attr, amendShape(attr), cell)
-  }
-  /** A copy of SubscriberSource that allows access to the subscriber through the cell but can only materialized once */
-  private class OneTimeSubscriberSource[Out](val attributes: Attributes, shape: SourceShape[Out], cell: OneTimeWriteCell[Subscriber[Out]])
-    extends SourceModule[Out, Subscriber[Out]](shape) {
-
-    override def create(context: MaterializationContext): (Publisher[Out], Subscriber[Out]) = {
-      val processor = new Processor[Out, Out] {
-        @volatile private var subscriber: Subscriber[_ >: Out] = null
-
-        override def subscribe(s: Subscriber[_ >: Out]): Unit = subscriber = s
-
-        override def onError(t: Throwable): Unit = subscriber.onError(t)
-        override def onSubscribe(s: Subscription): Unit = subscriber.onSubscribe(s)
-        override def onComplete(): Unit = subscriber.onComplete()
-        override def onNext(t: Out): Unit = subscriber.onNext(t)
-      }
-      cell.setValue(processor)
-
-      (processor, processor)
-    }
-
-    override protected def newInstance(shape: SourceShape[Out]): SourceModule[Out, Subscriber[Out]] =
-      new OneTimeSubscriberSource[Out](attributes, shape, cell)
-    override def withAttributes(attr: Attributes): OneTimeSubscriberSource[Out] =
-      new OneTimeSubscriberSource[Out](attr, amendShape(attr), cell)
-  }
-
-  trait ReadableCell[+T] {
-    def value: T
-  }
-  /** A one time settable cell */
-  class OneTimeWriteCell[T <: AnyRef] extends AtomicReference[T] with ReadableCell[T] {
-    def value: T = {
-      val value = get()
-      require(value != null, "Value wasn't set yet")
-      value
-    }
-
-    def setValue(value: T): Unit =
-      if (!compareAndSet(null.asInstanceOf[T], value))
-        throw new IllegalStateException("Value can be only set once.")
   }
 
   /**
