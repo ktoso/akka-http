@@ -22,7 +22,7 @@ object MiMa extends AutoPlugin {
     mimaFiltersDirectory := (sourceDirectory in Compile).value / "mima-filters",
     mimaBackwardIssueFilters ++= {
       val directory = mimaFiltersDirectory.value
-      if (directory.exists) loadMimaIgnoredProblems(directory, ".backwards.excludes", streams.value.log)
+      if (directory.exists) loadMimaIgnoredProblems(directory, ".backwards.excludes")
       else Map.empty
     },
     mimaPreviousArtifacts :=
@@ -53,7 +53,7 @@ object MiMa extends AutoPlugin {
   }
 
   import com.typesafe.tools.mima.core._
-  def loadMimaIgnoredProblems(directory: File, fileExtension: String, logger: Logger): Map[String, Seq[ProblemFilter]] = {
+  def loadMimaIgnoredProblems(directory: File, fileExtension: String): Map[String, Seq[ProblemFilter]] = {
     val FilterAnyProblemPattern = """FilterAnyProblem\("([^"]+)"\)""".r
     val FilterAnyProblemStartingWithPattern = """FilterAnyProblemStartingWith\("([^"]+)"\)""".r
     val ExclusionPattern = """ProblemFilters\.exclude\[([^\]]+)\]\("([^"]+)"\)""".r
@@ -92,7 +92,7 @@ object MiMa extends AutoPlugin {
 
     if (failures.isEmpty) mappings.map(_.right.get).toMap
     else {
-      failures.flatMap(_.left.get).foreach(ex => logger.error(ex.getMessage))
+      failures.flatMap(_.left.get).foreach(ex => println(ex.getMessage))
 
       throw new RuntimeException(s"Loading Mima filters failed with ${failures.size} failures.")
     }
