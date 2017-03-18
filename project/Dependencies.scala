@@ -83,6 +83,8 @@ object Dependencies {
     Test.sprayJson, // for WS Autobahn test metadata
     Test.scalatest.value, Test.scalacheck.value, Test.junit)
 
+  lazy val httpCaching = l ++= Seq(Test.scalatest.value)
+
   lazy val http = l ++= Seq()
 
   lazy val http2 = l ++= Seq(hpack, alpnApi)

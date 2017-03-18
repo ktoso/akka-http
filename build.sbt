@@ -56,6 +56,7 @@ lazy val root = Project(
     httpCore,
     http2Support,
     http,
+    httpCaching,
     httpTestkit,
     httpTests,
     httpMarshallersScala,
@@ -121,6 +122,11 @@ lazy val httpMarshallersJava = project("akka-http-marshallers-java")
 
 lazy val httpJackson =
   httpMarshallersJavaSubproject("jackson")
+
+lazy val httpCaching = project("akka-http-caching")
+  .settings(Dependencies.httpCaching)
+  .settings(Version.versionSettings)
+  .dependsOn(http, httpCore, httpTestkit % "test")
 
 def project(name: String) =
   Project(id = name, base = file(name))
