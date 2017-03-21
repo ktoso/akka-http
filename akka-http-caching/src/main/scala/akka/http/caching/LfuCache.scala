@@ -6,16 +6,16 @@ import scala.collection.JavaConverters._
 import scala.concurrent.duration.Duration
 import scala.concurrent.Future
 import com.github.benmanes.caffeine.cache.{ AsyncCacheLoader, AsyncLoadingCache, Caffeine }
-import akka.http.caching.LruCache.toJavaMappingFunction
+import akka.http.caching.LfuCache.toJavaMappingFunction
 
 import scala.compat.java8.FutureConverters._
 import scala.compat.java8.FunctionConverters._
 
-object LruCache {
+object LfuCache {
 
   /**
-   * Creates a new [[akka.http.caching.ExpiringLruCache]] or
-   * [[akka.http.caching.SimpleLruCache]] instance depending on whether
+   * Creates a new [[akka.http.caching.ExpiringLfuCache]] or
+   * [[akka.http.caching.SimpleLfuCache]] instance depending on whether
    * a non-zero and finite timeToLive and/or timeToIdle is set or not.
    */
   def apply[V](
@@ -30,16 +30,16 @@ object LruCache {
     }
 
     if (timeToLive.isFinite() || timeToIdle.isFinite())
-      new ExpiringLruCache[V](maxCapacity, initialCapacity, timeToLive, timeToIdle, loader)
+      new ExpiringLfuCache[V](maxCapacity, initialCapacity, timeToLive, timeToIdle, loader)
     else
-      new SimpleLruCache[V](maxCapacity, initialCapacity, loader)
+      new SimpleLfuCache[V](maxCapacity, initialCapacity, loader)
   }
 
   def toJavaMappingFunction[V](genValue: () ⇒ Future[V]) =
     asJavaBiFunction[Any, Executor, CompletableFuture[V]]((k, e) ⇒ genValue().toJava.toCompletableFuture)
 }
 
-trait LruCache[V] extends Cache[V] {
+trait LfuCache[V] extends Cache[V] {
 
   private[caching] val store: AsyncLoadingCache[Any, V]
 
@@ -56,8 +56,8 @@ trait LruCache[V] extends Cache[V] {
   def size: Int = store.synchronous().asMap().size()
 }
 
-final class SimpleLruCache[V](val maxCapacity: Int, val initialCapacity: Int,
-                              defaultLoader: AsyncCacheLoader[Any, V]) extends LruCache[V] {
+final class SimpleLfuCache[V](val maxCapacity: Int, val initialCapacity: Int,
+                              defaultLoader: AsyncCacheLoader[Any, V]) extends LfuCache[V] {
   require(maxCapacity >= 0, "maxCapacity must not be negative")
   require(initialCapacity <= maxCapacity, "initialCapacity must be <= maxCapacity")
 
@@ -67,9 +67,9 @@ final class SimpleLruCache[V](val maxCapacity: Int, val initialCapacity: Int,
     .buildAsync[Any, V](defaultLoader)
 }
 
-final class ExpiringLruCache[V](maxCapacity: Long, initialCapacity: Int,
+final class ExpiringLfuCache[V](maxCapacity: Long, initialCapacity: Int,
                                 timeToLive: Duration, timeToIdle: Duration,
-                                defaultLoader: AsyncCacheLoader[Any, V]) extends LruCache[V] {
+                                defaultLoader: AsyncCacheLoader[Any, V]) extends LfuCache[V] {
   require(
     !timeToLive.isFinite || !timeToIdle.isFinite || timeToLive > timeToIdle,
     s"timeToLive($timeToLive) must be greater than timeToIdle($timeToIdle)")

@@ -1,7 +1,7 @@
 package akka.http.routing.directives
 
 import akka.actor.ActorRefFactory
-import akka.http.caching.{ Cache, LruCache }
+import akka.http.caching.{ Cache, LfuCache }
 import akka.http.scaladsl.server.Directive0
 
 import scala.concurrent.duration.Duration
@@ -50,13 +50,13 @@ trait CachingDirectives {
     }
   }
 
-  //LruCache requires a loader function on creation - this will not be used.
+  //LfuCache requires a loader function on creation - this will not be used.
   private val defaultLoader = (k: Any) ⇒ Future.successful(Rejected(Nil))
 
   //# route-Cache
   def routeCache(maxCapacity: Int = 500, initialCapacity: Int = 16, timeToLive: Duration = Duration.Inf,
                  timeToIdle: Duration = Duration.Inf): Cache[RouteResult] = {
-    LruCache(defaultLoader, maxCapacity, initialCapacity, timeToLive, timeToIdle)
+    LfuCache(defaultLoader, maxCapacity, initialCapacity, timeToLive, timeToIdle)
   }
   //#
 }
