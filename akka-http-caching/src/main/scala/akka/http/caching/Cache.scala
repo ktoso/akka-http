@@ -44,7 +44,7 @@ trait Cache[V] { cache ⇒
   /**
    * Removes the cache item for the given key. Returns the removed item if it was found (and removed).
    */
-  def remove(key: Any): Option[Future[V]]
+  def remove(key: Any): Unit
 
   /**
    * Clears the cache by removing all entries.

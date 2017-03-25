@@ -47,7 +47,7 @@ trait LfuCache[V] extends Cache[V] {
 
   def apply(key: Any, genValue: () ⇒ Future[V]): Future[V] = store.get(key, toJavaMappingFunction(genValue)).toScala
 
-  def remove(key: Any): Option[Future[V]] = Option(store.synchronous().asMap().remove(key)).map(Future.successful)
+  def remove(key: Any): Unit = store.synchronous().invalidate(key)
 
   def clear(): Unit = store.synchronous().invalidateAll()
 
