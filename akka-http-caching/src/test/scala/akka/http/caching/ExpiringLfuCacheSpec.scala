@@ -1,10 +1,9 @@
-package akka.http.caching.caching
+package akka.http.caching
 
 import java.util.Random
 import java.util.concurrent.{ CountDownLatch, Executor }
 
 import akka.actor.ActorSystem
-import akka.http.caching.ExpiringLfuCache
 import akka.testkit.TestKit
 import com.github.benmanes.caffeine.cache.AsyncCacheLoader
 import org.scalatest.{ BeforeAndAfterAll, Matchers, WordSpec }

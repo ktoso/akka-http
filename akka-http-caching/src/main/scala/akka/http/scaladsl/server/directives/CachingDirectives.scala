@@ -1,4 +1,4 @@
-package akka.http.routing.directives
+package akka.http.scaladsl.server.directives
 
 import akka.actor.ActorRefFactory
 import akka.http.caching.{ Cache, LfuCache }
