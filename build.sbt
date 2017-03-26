@@ -149,7 +149,7 @@ lazy val docs = project("docs")
   .enablePlugins(AkkaParadoxPlugin, NoPublish, DeployRsync)
   .disablePlugins(BintrayPlugin, MimaPlugin)
   .dependsOn(
-    httpCore, http, httpXml, httpMarshallersJava, httpMarshallersScala,
+    httpCore, http, httpXml, httpMarshallersJava, httpMarshallersScala, httpCaching,
     httpTests % "compile;test->test", httpTestkit % "compile;test->test"
   )
   .settings(Dependencies.docs)
