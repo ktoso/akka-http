@@ -4,9 +4,13 @@
 
 package akka.http.impl.engine.http2
 
+import java.net.InetSocketAddress
+
 import akka.NotUsed
 import akka.http.impl.engine.http2.Http2Protocol.ErrorCode
 import akka.http.impl.engine.http2.Http2Protocol.ErrorCode.{ COMPRESSION_ERROR, FLOW_CONTROL_ERROR, FRAME_SIZE_ERROR }
+import akka.http.impl.engine.server.HttpAttributes
+import akka.http.scaladsl.model.RemoteAddress
 import akka.http.scaladsl.model.http2.{ Http2Exception, PeerClosedStreamException }
 import akka.stream.Attributes
 import akka.stream.BidiShape
@@ -14,6 +18,7 @@ import akka.stream.Inlet
 import akka.stream.Outlet
 import akka.stream.impl.io.ByteStringParser.ParsingException
 import akka.stream.scaladsl.Source
+import akka.http.scaladsl.model.headers
 import akka.stream.stage.{ GraphStage, GraphStageLogic, InHandler, StageLogging }
 import akka.util.ByteString
 
@@ -81,9 +86,12 @@ class Http2ServerDemux extends GraphStage[BidiShape[Http2SubStream, FrameEvent, 
     new GraphStageLogic(shape) with Http2MultiplexerSupport with Http2StreamHandling with GenericOutletSupport with StageLogging {
       logic ⇒
 
+      private val remoteAddressHeader = inheritedAttributes.get[HttpAttributes.RemoteAddress].flatMap(_.address)
+        .map(addr ⇒ headers.`Remote-Address`(RemoteAddress(addr)))
+
       override protected def logSource: Class[_] = classOf[Http2ServerDemux]
 
-      val multiplexer = createMultiplexer(frameOut, StreamPrioritizer.first())
+      override val multiplexer = createMultiplexer(frameOut, StreamPrioritizer.first())
 
       override def preStart(): Unit = {
         pull(frameIn)
@@ -104,7 +112,7 @@ class Http2ServerDemux extends GraphStage[BidiShape[Http2SubStream, FrameEvent, 
        */
       def lastStreamId: Int = 1
 
-      def pushGOAWAY(errorCode: ErrorCode, debug: String): Unit = {
+      override def pushGOAWAY(errorCode: ErrorCode, debug: String): Unit = {
         // http://httpwg.org/specs/rfc7540.html#rfc.section.6.8
         val last = lastStreamId
         closedAfter = Some(last)
@@ -115,7 +123,7 @@ class Http2ServerDemux extends GraphStage[BidiShape[Http2SubStream, FrameEvent, 
 
       setHandler(frameIn, new InHandler {
 
-        def onPush(): Unit = {
+        override def onPush(): Unit = {
           val in = grab(frameIn)
           in match {
             case WindowUpdateFrame(streamId, increment) ⇒ multiplexer.updateWindow(streamId, increment) // handled specially
@@ -186,7 +194,14 @@ class Http2ServerDemux extends GraphStage[BidiShape[Http2SubStream, FrameEvent, 
       })
 
       val bufferedSubStreamOutput = new BufferedOutlet[Http2SubStream](substreamOut)
-      def dispatchSubstream(sub: Http2SubStream): Unit = bufferedSubStreamOutput.push(sub)
+      override def dispatchSubstream(sub: Http2SubStream): Unit = {
+        val subStream = remoteAddressHeader match {
+          case Some(addr) ⇒ sub.copy(additionalHeaders = addr +: sub.additionalHeaders)
+          case _          ⇒ sub
+        }
+
+        bufferedSubStreamOutput.push(subStream)
+      }
 
       def failSubstream(streamId: Int, errorCode: ErrorCode, description: String): Unit = {
         log.debug(s"Substream $streamId failed with $errorCode: $description")
@@ -194,7 +209,7 @@ class Http2ServerDemux extends GraphStage[BidiShape[Http2SubStream, FrameEvent, 
       }
 
       setHandler(substreamIn, new InHandler {
-        def onPush(): Unit = {
+        override def onPush(): Unit = {
           val sub = grab(substreamIn)
           pull(substreamIn)
           multiplexer.registerSubStream(sub)

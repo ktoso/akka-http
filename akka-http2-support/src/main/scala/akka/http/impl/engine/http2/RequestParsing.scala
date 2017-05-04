@@ -38,6 +38,7 @@ private[http2] object RequestParsing {
         checkRequiredField(":path", path)
 
         headers += Http2StreamIdHeader(subStream.streamId)
+        headers ++= subStream.additionalHeaders
 
         val entity =
           if (subStream.data == Source.empty || contentLength == 0) HttpEntity.Empty
