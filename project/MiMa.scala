@@ -18,6 +18,11 @@ object MiMa extends AutoPlugin {
 
   val mimaFiltersDirectory = settingKey[File]("Directory containing mima filters.")
 
+  //Exclude these non-existent versions when checking compatibility with previous versions
+  private val ignoredModules = Map(
+    "akka-http-caching" -> Set("10.0.0", "10.0.1", "10.0.2", "10.0.3", "10.0.4", "10.0.5", "10.0.6")
+  )
+
   override val projectSettings = Seq(
     mimaFiltersDirectory := (sourceDirectory in Compile).value / "mima-filters",
     mimaBackwardIssueFilters ++= {
@@ -37,7 +42,9 @@ object MiMa extends AutoPlugin {
           "10.0.6",
           "10.0.7"
       )
-        .collect { case version if name.value != "akka-http-caching" => organization.value %% name.value % version }
+        .collect { case version if !ignoredModules.get(name.value).exists(_.contains(version)) =>
+          organization.value %% name.value % version
+        }
   )
 
   case class FilterAnyProblem(name: String) extends com.typesafe.tools.mima.core.ProblemFilter {
