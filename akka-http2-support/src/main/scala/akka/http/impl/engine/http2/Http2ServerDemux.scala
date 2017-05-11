@@ -195,12 +195,7 @@ class Http2ServerDemux extends GraphStage[BidiShape[Http2SubStream, FrameEvent, 
 
       val bufferedSubStreamOutput = new BufferedOutlet[Http2SubStream](substreamOut)
       override def dispatchSubstream(sub: Http2SubStream): Unit = {
-        val subStream = remoteAddressHeader match {
-          case Some(addr) ⇒ sub.copy(additionalHeaders = addr +: sub.additionalHeaders)
-          case _          ⇒ sub
-        }
-
-        bufferedSubStreamOutput.push(subStream)
+        bufferedSubStreamOutput.push(sub)
       }
 
       def failSubstream(streamId: Int, errorCode: ErrorCode, description: String): Unit = {

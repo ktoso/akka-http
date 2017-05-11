@@ -9,7 +9,7 @@ import akka.event.LoggingAdapter
 import akka.http.impl.engine.http2.framing.{ Http2FrameParsing, Http2FrameRendering }
 import akka.http.impl.engine.http2.hpack.{ HeaderCompression, HeaderDecompression }
 import akka.http.impl.engine.parsing.HttpHeaderParser
-import akka.http.impl.engine.server.HttpAttributes.RemoteAddress
+import akka.http.impl.engine.server.HttpAttributes
 import akka.http.impl.util.StreamUtils
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.http2.Http2StreamIdHeader
@@ -17,16 +17,14 @@ import akka.http.scaladsl.settings.{ ParserSettings, ServerSettings }
 import akka.stream.scaladsl.{ BidiFlow, Flow, Source }
 import akka.util.ByteString
 
-import scala.collection.immutable
 import scala.concurrent.{ ExecutionContext, Future }
 
 /**
  * Represents one direction of an Http2 substream.
  */
 private[http2] final case class Http2SubStream(
-  initialHeaders:    ParsedHeadersFrame,
-  data:              Source[ByteString, Any],
-  additionalHeaders: immutable.Seq[HttpHeader] = Nil) { // TODO cleanup, some other way to propagate them?
+  initialHeaders: ParsedHeadersFrame,
+  data:           Source[ByteString, Any]) {
   def streamId: Int = initialHeaders.streamId
 }
 
@@ -87,9 +85,10 @@ object Http2Blueprint {
     }
     BidiFlow.fromFlows(
       Flow[HttpResponse].map(ResponseRendering.renderResponse(settings, log)),
-      Flow[Http2SubStream].via(StreamUtils.statefulMap { () ⇒
+      Flow[Http2SubStream].via(StreamUtils.statefulAttrsMap { attrs ⇒ el ⇒
         val headerParser = masterHttpHeaderParser.createShallowCopy()
-        RequestParsing.parseRequest(headerParser)
+        attrs.get[HttpAttributes.RemoteAddress]
+        RequestParsing.parseRequest(headerParser, attrs)(el)
       }))
   }
 

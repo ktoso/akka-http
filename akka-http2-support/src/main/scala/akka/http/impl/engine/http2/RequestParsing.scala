@@ -8,6 +8,7 @@ import akka.annotation.InternalApi
 import akka.http.impl.engine.parsing.HttpHeaderParser
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.http2.Http2StreamIdHeader
+import akka.stream.Attributes
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 
@@ -19,7 +20,7 @@ import scala.collection.immutable.VectorBuilder
  */
 @InternalApi
 private[http2] object RequestParsing {
-  def parseRequest(httpHeaderParser: HttpHeaderParser)(subStream: Http2SubStream): HttpRequest = {
+  def parseRequest(httpHeaderParser: HttpHeaderParser, attrs: Attributes)(subStream: Http2SubStream): HttpRequest = {
     @tailrec
     def rec(
       remainingHeaders: Seq[(String, String)],
@@ -38,7 +39,6 @@ private[http2] object RequestParsing {
         checkRequiredField(":path", path)
 
         headers += Http2StreamIdHeader(subStream.streamId)
-        headers ++= subStream.additionalHeaders
 
         val entity =
           if (subStream.data == Source.empty || contentLength == 0) HttpEntity.Empty

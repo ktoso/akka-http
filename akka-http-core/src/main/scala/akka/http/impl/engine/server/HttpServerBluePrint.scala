@@ -97,7 +97,6 @@ private[http] object HttpServerBluePrint {
     override val shape: FlowShape[RequestOutput, HttpRequest] = FlowShape.of(in, out)
 
     override def createLogic(inheritedAttributes: Attributes) = new GraphStageLogic(shape) with InHandler with OutHandler {
-      val remoteAddress = inheritedAttributes.get[HttpAttributes.RemoteAddress].flatMap(_.address)
       var downstreamPullWaiting = false
       var completionDeferred = false
       var entitySource: SubSourceOutlet[RequestOutput] = _
@@ -120,10 +119,13 @@ private[http] object HttpServerBluePrint {
       override def onPush(): Unit = grab(in) match {
         case RequestStart(method, uri, protocol, hdrs, entityCreator, _, _) ⇒
           val effectiveMethod = if (method == HttpMethods.HEAD && settings.transparentHeadRequests) HttpMethods.GET else method
-          val effectiveHeaders =
-            if (settings.remoteAddressHeader && remoteAddress.isDefined)
-              headers.`Remote-Address`(RemoteAddress(remoteAddress.get)) +: hdrs
-            else hdrs
+          val effectiveHeaders = if (settings.remoteAddressHeader) {
+            inheritedAttributes.get[HttpAttributes.RemoteAddress] match {
+              case Some(remoteAddress) if remoteAddress.address.isDefined ⇒
+                headers.`Remote-Address`(RemoteAddress(remoteAddress.address.get)) +: hdrs
+              case _ ⇒ hdrs
+            }
+          } else hdrs
 
           val entity = createEntity(entityCreator) withSizeLimit settings.parserSettings.maxContentLength
           push(out, HttpRequest(effectiveMethod, uri, effectiveHeaders, entity, protocol))
