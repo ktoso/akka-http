@@ -86,9 +86,6 @@ class Http2ServerDemux extends GraphStage[BidiShape[Http2SubStream, FrameEvent, 
     new GraphStageLogic(shape) with Http2MultiplexerSupport with Http2StreamHandling with GenericOutletSupport with StageLogging {
       logic ⇒
 
-      private val remoteAddressHeader = inheritedAttributes.get[HttpAttributes.RemoteAddress].flatMap(_.address)
-        .map(addr ⇒ headers.`Remote-Address`(RemoteAddress(addr)))
-
       override protected def logSource: Class[_] = classOf[Http2ServerDemux]
 
       override val multiplexer = createMultiplexer(frameOut, StreamPrioritizer.first())

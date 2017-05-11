@@ -85,10 +85,9 @@ object Http2Blueprint {
     }
     BidiFlow.fromFlows(
       Flow[HttpResponse].map(ResponseRendering.renderResponse(settings, log)),
-      Flow[Http2SubStream].via(StreamUtils.statefulAttrsMap { attrs ⇒ el ⇒
+      Flow[Http2SubStream].via(StreamUtils.statefulAttrsMap { attrs ⇒
         val headerParser = masterHttpHeaderParser.createShallowCopy()
-        attrs.get[HttpAttributes.RemoteAddress]
-        RequestParsing.parseRequest(headerParser, attrs)(el)
+        RequestParsing.parseRequest(headerParser, settings, attrs)
       }))
   }
 

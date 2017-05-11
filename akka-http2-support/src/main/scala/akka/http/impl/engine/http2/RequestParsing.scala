@@ -6,8 +6,11 @@ package akka.http.impl.engine.http2
 
 import akka.annotation.InternalApi
 import akka.http.impl.engine.parsing.HttpHeaderParser
+import akka.http.impl.engine.server.HttpAttributes
+import akka.http.scaladsl.model
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.http2.Http2StreamIdHeader
+import akka.http.scaladsl.settings.ServerSettings
 import akka.stream.Attributes
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
@@ -20,7 +23,10 @@ import scala.collection.immutable.VectorBuilder
  */
 @InternalApi
 private[http2] object RequestParsing {
-  def parseRequest(httpHeaderParser: HttpHeaderParser, attrs: Attributes)(subStream: Http2SubStream): HttpRequest = {
+  def parseRequest(
+    httpHeaderParser: HttpHeaderParser,
+    serverSettings:   ServerSettings,
+    attributes:       Attributes)(subStream: Http2SubStream): HttpRequest = {
     @tailrec
     def rec(
       remainingHeaders: Seq[(String, String)],
@@ -39,6 +45,15 @@ private[http2] object RequestParsing {
         checkRequiredField(":path", path)
 
         headers += Http2StreamIdHeader(subStream.streamId)
+
+        if (serverSettings.remoteAddressHeader) {
+          // in order to avoid searching all the time for the attribute, we need to guard it with the setting condition
+          attributes.get[HttpAttributes.RemoteAddress] match {
+            case Some(remote) if remote.address.isDefined ⇒
+              headers += model.headers.`Remote-Address`(RemoteAddress(remote.address.get))
+            case _ ⇒ // ignore; remote header was requested in config, however it's not available
+          }
+        }
 
         val entity =
           if (subStream.data == Source.empty || contentLength == 0) HttpEntity.Empty
