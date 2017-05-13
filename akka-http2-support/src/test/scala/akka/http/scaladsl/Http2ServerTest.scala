@@ -47,26 +47,26 @@ object Http2ServerTest extends App {
     akka.pattern.after(millis.millis, system.scheduler)(Future.successful(t))
   }
 
-  val syncHandler: HttpRequest ⇒ HttpResponse = {
+  def syncHandler(http2: Boolean): HttpRequest ⇒ HttpResponse = {
     case req @ HttpRequest(GET, Uri.Path("/"), _, _, _)     ⇒ HttpResponse(200, entity = req.header[headers.`Remote-Address`].toString)
     case HttpRequest(GET, Uri.Path("/ping"), _, _, _)       ⇒ HttpResponse(entity = "PONG!")
-    case HttpRequest(GET, Uri.Path("/image-page"), _, _, _) ⇒ imagePage
+    case HttpRequest(GET, Uri.Path("/image-page"), _, _, _) ⇒ imagePage(http2)
     case HttpRequest(GET, Uri(_, _, p, _, _), _, _, _) if p.toString.startsWith("/image1") ⇒
-      HttpResponse(entity = HttpEntity(MediaTypes.`image/jpeg`, FileIO.fromPath(Paths.get("bigimage.jpg"), 100000).mapAsync(1)(slowDown(1))))
+      HttpResponse(entity = HttpEntity(MediaTypes.`image/jpeg`, FileIO.fromPath(Paths.get("bigimage.jpg"), 100000).mapAsync(1)(slowDown(10))))
     case HttpRequest(GET, Uri(_, _, p, _, _), _, _, _) if p.toString.startsWith("/image2") ⇒
-      HttpResponse(entity = HttpEntity(MediaTypes.`image/jpeg`, FileIO.fromPath(Paths.get("bigimage2.jpg"), 150000).mapAsync(1)(slowDown(2))))
+      HttpResponse(entity = HttpEntity(MediaTypes.`image/jpeg`, FileIO.fromPath(Paths.get("bigimage2.jpg"), 150000).mapAsync(1)(slowDown(20))))
     case HttpRequest(GET, Uri.Path("/crash"), _, _, _) ⇒ sys.error("BOOM!")
     case _: HttpRequest                                ⇒ HttpResponse(404, entity = "Unknown resource!")
   }
 
-  val asyncHandler: HttpRequest ⇒ Future[HttpResponse] =
-    req ⇒ Future.successful(syncHandler(req))
+  def asyncHandler(http2: Boolean): HttpRequest ⇒ Future[HttpResponse] =
+    req ⇒ Future.successful(syncHandler(http2)(req))
 
   try {
     val bindings =
       for {
-        binding1 ← Http().bindAndHandleAsync(asyncHandler, interface = "localhost", port = 9000, ExampleHttpContexts.exampleServerContext)
-        binding2 ← Http2().bindAndHandleAsync(asyncHandler, interface = "localhost", port = 9001, ExampleHttpContexts.exampleServerContext)
+        binding1 ← Http().bindAndHandleAsync(asyncHandler(http2 = false), interface = "localhost", port = 9000, ExampleHttpContexts.exampleServerContext)
+        binding2 ← Http2().bindAndHandleAsync(asyncHandler(http2 = true), interface = "localhost", port = 9001, ExampleHttpContexts.exampleServerContext)
       } yield (binding1, binding2)
 
     Await.result(bindings, 1.second) // throws if binding fails
@@ -101,15 +101,15 @@ object Http2ServerTest extends App {
          |<img width="80" height="60" src="/image2?cachebuster=${Random.nextInt}"></img>
          |""".stripMargin
 
-    Seq.fill(20)(one()).mkString
+    Seq.fill(32)(one()).mkString
   }
 
-  lazy val imagePage = HttpResponse(
+  def imagePage(http2: Boolean) = HttpResponse(
     entity = HttpEntity(
       ContentTypes.`text/html(UTF-8)`,
       s"""|<html>
           | <body>
-          |    <h1>Image Page</h1>
+          |    <h1>Image Page""".stripMargin + (if (http2) " (HTTP2)" else "") + s"""</h1> 
           |    $imagesBlock
           |  </body>
           |</html>""".stripMargin))
