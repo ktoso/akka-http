@@ -10,8 +10,10 @@ import akka.actor.ActorSystem
 import akka.http.impl.util.ExampleHttpContexts
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model._
+import akka.http.scaladsl.server.Directives
 import akka.stream._
-import akka.stream.scaladsl.FileIO
+import akka.stream.scaladsl.{ FileIO, Source }
+import akka.util.ByteString
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
 
@@ -21,7 +23,7 @@ import scala.concurrent.duration._
 import scala.io.StdIn
 import scala.util.Random
 
-object Http2ServerTest extends App {
+object Http2ServerTest extends App with Directives {
   val testConf: Config = ConfigFactory.parseString("""
     akka.loglevel = INFO
     
@@ -101,7 +103,7 @@ object Http2ServerTest extends App {
          |<img width="80" height="60" src="/image2?cachebuster=${Random.nextInt}"></img>
          |""".stripMargin
 
-    Seq.fill(32)(one()).mkString
+    Seq.fill(20)(one()).mkString
   }
 
   def imagePage(http2: Boolean) = HttpResponse(
