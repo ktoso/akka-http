@@ -10,6 +10,7 @@ import akka.actor.ActorSystem
 import akka.http.impl.util.ExampleHttpContexts
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model._
+import akka.http.scaladsl.settings.ServerSettings
 import akka.stream._
 import akka.stream.scaladsl.FileIO
 import com.typesafe.config.Config
@@ -45,25 +46,20 @@ object Http2ServerTest extends App {
   }
 
   val syncHandler: HttpRequest ⇒ HttpResponse = {
-    case HttpRequest(GET, Uri.Path("/"), _, _, _)           ⇒ index
-    case HttpRequest(GET, Uri.Path("/ping"), _, _, _)       ⇒ HttpResponse(entity = "PONG!")
-    case HttpRequest(GET, Uri.Path("/image-page"), _, _, _) ⇒ imagePage
-    case HttpRequest(GET, Uri(_, _, p, _, _), _, _, _) if p.toString.startsWith("/image1") ⇒
-      HttpResponse(entity = HttpEntity(MediaTypes.`image/jpeg`, FileIO.fromPath(Paths.get("bigimage.jpg"), 100000).mapAsync(1)(slowDown(1))))
-    case HttpRequest(GET, Uri(_, _, p, _, _), _, _, _) if p.toString.startsWith("/image2") ⇒
-      HttpResponse(entity = HttpEntity(MediaTypes.`image/jpeg`, FileIO.fromPath(Paths.get("bigimage2.jpg"), 150000).mapAsync(1)(slowDown(2))))
-    case HttpRequest(GET, Uri.Path("/crash"), _, _, _) ⇒ sys.error("BOOM!")
-    case _: HttpRequest                                ⇒ HttpResponse(404, entity = "Unknown resource!")
+    case req @ HttpRequest(GET, Uri.Path("/"), _, _, _) ⇒
+      HttpResponse(entity = s"${req.headers.toList}")
   }
 
   val asyncHandler: HttpRequest ⇒ Future[HttpResponse] =
     req ⇒ Future.successful(syncHandler(req))
 
+  val s = ServerSettings(system).withRemoteAddressHeader(true)
+
   try {
     val bindings =
       for {
-        binding1 ← Http().bindAndHandleAsync(asyncHandler, interface = "localhost", port = 9000, ExampleHttpContexts.exampleServerContext)
-        binding2 ← Http2().bindAndHandleAsync(asyncHandler, interface = "localhost", port = 9001, ExampleHttpContexts.exampleServerContext)
+        binding1 ← Http().bindAndHandleAsync(asyncHandler, interface = "localhost", port = 9000, ExampleHttpContexts.exampleServerContext, s)
+        binding2 ← Http2().bindAndHandleAsync(asyncHandler, interface = "localhost", port = 9001, ExampleHttpContexts.exampleServerContext, s)
       } yield (binding1, binding2)
 
     Await.result(bindings, 1.second) // throws if binding fails
