@@ -20,7 +20,7 @@ object MiMa extends AutoPlugin {
 
   //Exclude these non-existent versions when checking compatibility with previous versions
   private val ignoredModules = Map(
-    "akka-http-caching" -> Set("10.0.0", "10.0.1", "10.0.2", "10.0.3", "10.0.4", "10.0.5", "10.0.6")
+    "akka-http-caching" -> Set("10.0.0", "10.0.1", "10.0.2", "10.0.3", "10.0.4", "10.0.5", "10.0.6", "10.0.7")
   )
 
   override val projectSettings = Seq(
