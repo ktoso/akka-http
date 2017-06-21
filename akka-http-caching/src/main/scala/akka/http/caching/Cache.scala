@@ -35,7 +35,7 @@ trait Cache[K, V] { cache ⇒
   def get(key: K): Option[Future[V]]
 
   /**
-   * Removes the cache item for the given key. Returns the removed item if it was found (and removed).
+   * Removes the cache item for the given key.
    */
   def remove(key: K): Unit
 
