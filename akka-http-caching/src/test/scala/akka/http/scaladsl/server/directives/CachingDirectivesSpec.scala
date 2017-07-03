@@ -1,3 +1,6 @@
+/**
+ * Copyright (C) 2017 Lightbend Inc. <http://www.lightbend.com/>
+ */
 package akka.http.scaladsl.server.directives
 
 import akka.http.impl.util.SingletonException
