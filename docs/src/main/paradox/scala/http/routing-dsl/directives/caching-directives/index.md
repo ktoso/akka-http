@@ -1,6 +1,21 @@
 # CachingDirectives
 
-To use the caching directives you need to add a dependency to the `akka-http-caching` project, and import `akka.http.scaladsl.server.directives.CachingDirectives`.
+Use these directives to "wrap" expensive operations with a caching layer that
+runs the wrapped operation only once and returns the the cached value for all
+future accesses for the same key (as long as the respective entry has not expired).
+See @ref[caching](../../../common/caching.md) for an introduction to how the
+caching support works.
+
+To enable caching support add a library dependency onto:
+
+@@dependency [sbt,Gradle,Maven] {
+  group="com.typesafe.akka"
+  artifact="akka-http-caching_$scala.binary.version$"
+  version="$project.version$"
+}
+
+Directives are available by importing
+`akka.http.scaladsl.server.directives.CachingDirectives`.
 
 @@toc { depth=1 }
 
