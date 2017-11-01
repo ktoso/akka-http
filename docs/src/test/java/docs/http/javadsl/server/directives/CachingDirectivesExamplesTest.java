@@ -13,7 +13,9 @@ import akka.http.javadsl.model.headers.*;
 import akka.http.javadsl.model.headers.CacheDirectives.*;
 import akka.http.javadsl.server.Route;
 import akka.http.javadsl.server.RequestContext;
-import static akka.http.javadsl.server.directives.AllCachingDirectives.*;
+//#caching-directives-import
+import static akka.http.javadsl.server.directives.CachingDirectives.*;
+//#caching-directives-import
 import akka.http.javadsl.testkit.JUnitRouteTest;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;

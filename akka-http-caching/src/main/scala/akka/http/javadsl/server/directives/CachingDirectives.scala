@@ -13,7 +13,7 @@ import akka.http.impl.util.JavaMapping
 import akka.http.javadsl.server.{ RequestContext, Route, RouteResult }
 
 @ApiMayChange
-abstract class CachingDirectives {
+object CachingDirectives {
 
   import akka.http.scaladsl.server.directives.{ CachingDirectives ⇒ D }
 
@@ -70,6 +70,3 @@ abstract class CachingDirectives {
   def routeCache[K](settings: CachingSettings): Cache[K, RouteResult] =
     JavaMapping.toJava(D.routeCache[K](settings))
 }
-
-@ApiMayChange
-object AllCachingDirectives extends CachingDirectives
