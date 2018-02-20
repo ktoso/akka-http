@@ -4,6 +4,7 @@
 
 package akka.http.javadsl.server;
 
+import akka.Done;
 import akka.NotUsed;
 import akka.actor.ActorSystem;
 import akka.http.javadsl.ConnectHttp;
@@ -69,14 +70,14 @@ public class JavaTestServer extends AllDirectives { // or import static Directiv
 
     final Unmarshaller<ByteString, JavaTweet> JavaTweets = Jackson.byteStringUnmarshaller(JavaTweet.class);
     final Route tweets = path("tweets", () ->
-      get(() -> 
+      get(() ->
         parameter(StringUnmarshallers.INTEGER, "n", n -> {
           final Source<JavaTweet, NotUsed> tws = Source.repeat(new JavaTweet("Hello World!")).take(n);
           return completeOKWithSource(tws, Jackson.marshaller(), EntityStreamingSupport.json());
         })
       ).orElse(
       post(() ->
-        extractMaterializer(mat -> 
+        extractMaterializer(mat ->
           entityAsSourceOf(JavaTweets, null, sourceOfTweets -> {
             final CompletionStage<Integer> tweetsCount = sourceOfTweets.runFold(0, (acc, tweet) -> acc + 1, mat);
             return onComplete(tweetsCount, c -> complete("Total number of tweets: " + c));
@@ -84,7 +85,7 @@ public class JavaTestServer extends AllDirectives { // or import static Directiv
         )
       ))
     );
-    
+
     final Route inner = path("inner", () ->
       getFromResourceDirectory("someDir")
     );
@@ -154,7 +155,7 @@ public class JavaTestServer extends AllDirectives { // or import static Directiv
     return binding.thenAccept(b -> {
       System.out.println(String.format("Unbinding from %s", b.localAddress()));
 
-      final CompletionStage<BoxedUnit> unbound = b.unbind();
+      final CompletionStage<Done> unbound = b.unbind();
       try {
         unbound.toCompletableFuture().get(3, TimeUnit.SECONDS); // block...
       } catch (TimeoutException | InterruptedException | ExecutionException e) {
@@ -162,7 +163,7 @@ public class JavaTestServer extends AllDirectives { // or import static Directiv
       }
     });
   }
-  
+
   private static final class JavaTweet {
     private String message;
 
@@ -177,6 +178,6 @@ public class JavaTestServer extends AllDirectives { // or import static Directiv
     public String getMessage() {
       return message;
     }
-    
+
   }
 }

@@ -117,8 +117,10 @@ class HttpExt(private val config: Config)(implicit val system: ActorSystem) exte
     else if (connectionContext.isSecure) settings.defaultHttpsPort
     else settings.defaultHttpPort
 
-  private def materializeTcpBind(binding: Future[Tcp.ServerBinding]) =
-    binding.map(tcpBinding ⇒ ServerBinding(tcpBinding.localAddress)(() ⇒ tcpBinding.unbind()))(ExecutionContexts.sameThreadExecutionContext)
+  private def materializeTcpBind(binding: Future[Tcp.ServerBinding]) = {
+    val sameEx = ExecutionContexts.sameThreadExecutionContext
+    binding.map(tcpBinding ⇒ ServerBinding(tcpBinding.localAddress)(() ⇒ { tcpBinding.unbind().map(_ ⇒ Done)(sameEx) }))(sameEx)
+  }
 
   /**
    * Creates a [[akka.stream.scaladsl.Source]] of [[akka.http.scaladsl.Http.IncomingConnection]] instances which represents a prospective HTTP server binding
@@ -857,7 +859,7 @@ object Http extends ExtensionId[HttpExt] with ExtensionIdProvider {
    * @param localAddress  The local address of the endpoint bound by the materialization of the `connections` [[akka.stream.scaladsl.Source]]
    *
    */
-  final case class ServerBinding(localAddress: InetSocketAddress)(private val unbindAction: () ⇒ Future[Unit]) {
+  final case class ServerBinding(localAddress: InetSocketAddress)(private val unbindAction: () ⇒ Future[Done]) {
 
     /**
      * Asynchronously triggers the unbinding of the port that was bound by the materialization of the `connections`
@@ -865,7 +867,7 @@ object Http extends ExtensionId[HttpExt] with ExtensionIdProvider {
      *
      * The produced [[scala.concurrent.Future]] is fulfilled when the unbinding has been completed.
      */
-    def unbind(): Future[Unit] = unbindAction()
+    def unbind(): Future[Done] = unbindAction()
   }
 
   /**

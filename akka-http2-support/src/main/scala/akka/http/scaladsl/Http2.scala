@@ -107,8 +107,9 @@ class Http2Ext(private val config: Config)(implicit val system: ActorSystem)
             log.error(e, "Could not materialize handling flow for {}", incoming)
             throw e
         }
-    }.mapMaterializedValue {
-      _.map(tcpBinding ⇒ ServerBinding(tcpBinding.localAddress)(() ⇒ tcpBinding.unbind()))(fm.executionContext)
+    }.mapMaterializedValue { bindingFuture ⇒
+      val ec = fm.executionContext
+      bindingFuture.map(tcpBinding ⇒ ServerBinding(tcpBinding.localAddress)(() ⇒ tcpBinding.unbind().map(_ ⇒ Done)(ec)))(ec)
     }.to(Sink.ignore).run()
   }
 

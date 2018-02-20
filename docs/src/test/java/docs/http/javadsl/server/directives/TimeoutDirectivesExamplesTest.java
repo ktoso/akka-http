@@ -4,6 +4,7 @@
 
 package docs.http.javadsl.server.directives;
 
+import akka.Done;
 import akka.NotUsed;
 import akka.actor.ActorSystem;
 import akka.http.javadsl.ConnectHttp;
@@ -43,7 +44,7 @@ public class TimeoutDirectivesExamplesTest extends AllDirectives {
             + "akka.http.server.request-timeout = 1000s");
     // large timeout - 1000s (please note - setting to infinite will disable Timeout-Access header
     // and withRequestTimeout will not work)
-    
+
     private final ActorSystem system = ActorSystem.create("TimeoutDirectivesExamplesTest", testConf);
 
     private final ActorMaterializer materializer = ActorMaterializer.create(system);
@@ -54,7 +55,7 @@ public class TimeoutDirectivesExamplesTest extends AllDirectives {
         return binding.thenAccept(b -> {
             System.out.println(String.format("Unbinding from %s", b.localAddress()));
 
-            final CompletionStage<BoxedUnit> unbound = b.unbind();
+            final CompletionStage<Done> unbound = b.unbind();
             try {
                 unbound.toCompletableFuture().get(3, TimeUnit.SECONDS); // block...
             } catch (TimeoutException | InterruptedException | ExecutionException e) {
