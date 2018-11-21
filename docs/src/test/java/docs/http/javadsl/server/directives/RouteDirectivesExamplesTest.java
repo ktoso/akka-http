@@ -18,6 +18,36 @@ import java.util.Collections;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Function;
 
+//#complete
+import static akka.http.javadsl.server.Directives.complete;
+import static akka.http.javadsl.server.Directives.path;
+
+//#complete
+
+//#reject
+import akka.http.javadsl.server.Directives;
+
+import static akka.http.javadsl.server.Directives.complete;
+import static akka.http.javadsl.server.Directives.path;
+import static akka.http.javadsl.server.Directives.reject;
+import static akka.http.javadsl.server.Directives.route;
+
+//#reject
+//#redirect
+import static akka.http.javadsl.server.Directives.complete;
+import static akka.http.javadsl.server.Directives.pathEnd;
+import static akka.http.javadsl.server.Directives.pathPrefix;
+import static akka.http.javadsl.server.Directives.pathSingleSlash;
+import static akka.http.javadsl.server.Directives.redirect;
+import static akka.http.javadsl.server.Directives.route;
+
+//#redirect
+//#failWith
+import static akka.http.javadsl.server.Directives.failWith;
+import static akka.http.javadsl.server.Directives.path;
+
+//#failWith
+
 public class RouteDirectivesExamplesTest extends JUnitRouteTest {
 
   @Test
@@ -36,7 +66,7 @@ public class RouteDirectivesExamplesTest extends JUnitRouteTest {
   @Test
   public void testComplete() {
     //#complete
-    final Route route = route(
+    final Route route = concat(
       path("a", () -> complete(HttpResponse.create().withEntity("foo"))),
       path("b", () -> complete(StatusCodes.OK)),
       path("c", () -> complete(StatusCodes.CREATED, "bar")),
@@ -88,8 +118,8 @@ public class RouteDirectivesExamplesTest extends JUnitRouteTest {
   @Test
   public void testReject() {
     //#reject
-    final Route route = route(
-      path("a", this::reject), // don't handle here, continue on
+    final Route route = concat(
+      path("a", Directives::reject), // don't handle here, continue on
       path("a", () -> complete("foo")),
       path("b", () -> reject(Rejections.validationRejection("Restricted!")))
     );
@@ -107,7 +137,7 @@ public class RouteDirectivesExamplesTest extends JUnitRouteTest {
   public void testRedirect() {
     //#redirect
     final Route route = pathPrefix("foo", () ->
-      route(
+      concat(
         pathSingleSlash(() -> complete("yes")),
         pathEnd(() -> redirect(Uri.create("/foo/"), StatusCodes.PERMANENT_REDIRECT))
       )

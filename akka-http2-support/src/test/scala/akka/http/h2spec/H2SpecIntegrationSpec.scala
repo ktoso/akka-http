@@ -14,7 +14,6 @@ import akka.http.scaladsl.Http2
 import akka.stream.ActorMaterializer
 import akka.testkit._
 import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.exceptions.TestPendingException
 
 import scala.concurrent.duration._
 import scala.sys.process._
@@ -87,6 +86,30 @@ class H2SpecIntegrationSpec extends AkkaSpec(
         8.2. Server Push
       """.split("\n").map(_.trim).filterNot(_.isEmpty)
 
+    /** Cases that are known to fail, but we haven't triaged yet */
+    val pendingTestCases = Seq(
+      "4.2",
+      "4.3",
+      "5.1",
+      "5.1.1",
+      "5.5",
+      "6.1",
+      "6.5.2",
+      "6.9",
+      "6.9.1",
+      "6.10",
+      "8.1.2",
+      "8.1.2.1",
+      "8.1.2.2",
+      "8.1.2.6"
+    )
+
+    /**
+     * Cases that are known to fail because the TCK's expectations are
+     * different from our interpretation of the specs
+     */
+    val disabledTestCases = Seq()
+
     // execution of tests ------------------------------------------------------------------
     /*
     FIXME: don't fail any tests on jenkins for now
@@ -103,43 +126,49 @@ class H2SpecIntegrationSpec extends AkkaSpec(
 
       testNamesWithSectionNumbers foreach {
         case (name, sectionNr) ⇒
-          s"pass rule: $name" in {
-            runSpec(specSectionNumber = sectionNr)
-          }
+          if (!disabledTestCases.contains(sectionNr))
+            if (pendingTestCases.contains(sectionNr))
+              s"pass rule: $name" ignore {
+                runSpec(specSectionNumber = Some(sectionNr), junitOutput = new File(s"target/test-reports/h2spec-junit-$sectionNr.xml"))
+              }
+            else
+              s"pass rule: $name" in {
+                runSpec(specSectionNumber = Some(sectionNr), junitOutput = new File(s"target/test-reports/h2spec-junit-$sectionNr.xml"))
+              }
       }
     }
     // end of execution of tests -----------------------------------------------------------
 
-    def runSpec(specSectionNumber: String = null, junitOutput: File = null): Unit = {
-      require(specSectionNumber != null ^ junitOutput != null, "Only one of the parameters must be not null, selecting the mode we run in.")
+    def runSpec(specSectionNumber: Option[String], junitOutput: File): Unit = {
+      junitOutput.getParentFile.mkdirs()
+
       val TestFailureMarker = "×" // that special character is next to test failures, so we detect them by it
 
       val keepAccumulating = new AtomicBoolean(true)
-      val sb = new StringBuffer()
+      val stdout = new StringBuffer()
+      val stderr = new StringBuffer()
 
-      val command =
-        if (specSectionNumber != null) s"""$executable -k -t -p $port -s $specSectionNumber"""
-        else s"""$executable -k -t -p $port -j $junitOutput""" // include junit report
+      val command = s"$executable -k -t -p $port -j $junitOutput" + specSectionNumber.map(" -s " + _).getOrElse("")
       println(s"exec: $command")
       val aggregateTckLogs = ProcessLogger(
         out ⇒ {
           if (out.contains("All tests passed")) ()
           else if (out.contains("tests, ")) ()
           else if (out.contains("===========================================")) keepAccumulating.set(false)
-          else if (keepAccumulating.get) sb.append(out + Console.RESET + "\n  ")
+          else if (keepAccumulating.get) stdout.append(out + Console.RESET + "\n  ")
         },
-        _ ⇒ () // nothing is writtedn to stdout by this app
+        err ⇒ stderr.append(err)
       )
 
+      // p.exitValue blocks until the process is terminated
       val p = command.run(aggregateTckLogs)
+      val exitedWith = p.exitValue()
 
-      p.exitValue()
-      val output = sb.toString
-      info(output)
-      if (output.contains(TestFailureMarker)) {
-        throw new TestPendingException // FIXME we'll want to move to marking it as failures instead once we pass
-        // throw new AssertionError("Tck secion failed at least one test: ") with NoStackTrace
-      } else if (output.contains("0 failed")) ()
+      val output = stdout.toString
+      stderr.toString should be("")
+      output shouldNot startWith("Error:")
+      output shouldNot include(TestFailureMarker)
+      exitedWith should be(0)
     }
 
     def executable =

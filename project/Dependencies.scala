@@ -11,7 +11,7 @@ import scala.language.implicitConversions
 object Dependencies {
   import DependencyHelpers._
 
-  val jacksonVersion = "2.9.4"
+  val jacksonVersion = "2.9.5"
   val junitVersion = "4.12"
   val h2specVersion = "1.5.0"
   val h2specName = s"h2spec_${DependencyHelpers.osName}_amd64"
@@ -19,17 +19,16 @@ object Dependencies {
   val h2specUrl = s"https://github.com/summerwind/h2spec/releases/download/v${h2specVersion}/${h2specName}.zip"
   val alpnAgentVersion = "2.0.7"
 
-  lazy val akkaVersion = settingKey[String]("The version of Akka to use.")
   lazy val scalaTestVersion = settingKey[String]("The version of ScalaTest to use.")
   lazy val specs2Version = settingKey[String]("The version of Specs2 to use")
   lazy val scalaCheckVersion = settingKey[String]("The version of ScalaCheck to use.")
 
   val Versions = Seq(
-    crossScalaVersions := Seq("2.12.4", "2.11.12", "2.13.0-M3"),
+    crossScalaVersions := Seq("2.12.7", "2.11.12"/*, "2.13.0-M3"*/),
     scalaVersion := crossScalaVersions.value.head,
-    scalaCheckVersion := System.getProperty("akka.build.scalaCheckVersion", "1.13.5"),
-    scalaTestVersion := "3.0.5-M1",
-    specs2Version := "4.0.3"
+    scalaCheckVersion := System.getProperty("akka.build.scalaCheckVersion", "1.14.0"),
+    scalaTestVersion := "3.0.5",
+    specs2Version := "4.2.0"
   )
   import Versions._
 
@@ -39,7 +38,7 @@ object Dependencies {
     val scalaReflect  = ScalaVersionDependentModuleID.versioned("org.scala-lang" % "scala-reflect" % _) // Scala License
 
     // For akka-http spray-json support
-    val sprayJson   = "io.spray"                     %% "spray-json"                   % "1.3.4"       // ApacheV2
+    val sprayJson   = "io.spray"                     %% "spray-json"                   % "1.3.5"       // ApacheV2
 
     // For akka-http-jackson support
     val jackson     = "com.fasterxml.jackson.core"    % "jackson-databind"             % jacksonVersion // ApacheV2
@@ -56,7 +55,7 @@ object Dependencies {
 
     object Docs {
       val sprayJson   = Compile.sprayJson                                                                    % "test"
-      val gson        = "com.google.code.gson"             % "gson"                    % "2.8.2"             % "test"
+      val gson        = "com.google.code.gson"             % "gson"                    % "2.8.5"             % "test"
       val jacksonXml  = "com.fasterxml.jackson.dataformat" % "jackson-dataformat-xml"  % jacksonVersion      % "test" // ApacheV2
       val reflections = "org.reflections"                  % "reflections"             % "0.9.11"            % "test" // WTFPL
     }

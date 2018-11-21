@@ -184,7 +184,6 @@ class FileUploadDirectivesSpec extends RoutingSpec {
         status shouldEqual StatusCodes.OK
         responseAs[String] shouldEqual str1
       }
-
     }
 
     "stream the first file upload if multiple with the same name are posted" in {
@@ -238,14 +237,80 @@ class FileUploadDirectivesSpec extends RoutingSpec {
 
     }
 
+    "not cancel the stream after providing the expected part" in {
+      val route = echoAsAService
+      val str1 = "some data"
+
+      @volatile var secondWasFullyRead = false
+      val secondSource =
+        Source.fromIterator(() ⇒ Iterator.from(1))
+          .take(100)
+          .map { i ⇒
+            if (i == 100) secondWasFullyRead = true
+            akka.util.ByteString("abcdefghij")
+          }
+
+      val multipartForm =
+        Multipart.FormData(
+          Source(
+            Vector(
+              Multipart.FormData.BodyPart.Strict(
+                "field1",
+                HttpEntity(str1),
+                Map("filename" → "data1.txt")
+              ),
+              Multipart.FormData.BodyPart(
+                "field2",
+                HttpEntity.IndefiniteLength(ContentTypes.`application/octet-stream`, secondSource)
+              )
+            )
+          )
+        )
+
+      Post("/", multipartForm) ~> route ~> check {
+        status shouldEqual StatusCodes.OK
+        responseAs[String] shouldEqual str1
+        secondWasFullyRead shouldEqual true
+      }
+    }
+
+    "not be head-of-line-blocked if there is another big part before the part we are interested in" in {
+      val route = echoAsAService
+      val str1 = "some data"
+
+      val firstSource =
+        Source.repeat(ByteString("abcdefghij" * 100))
+          .take(1000) // 1MB
+
+      val multipartForm =
+        Multipart.FormData(
+          Source(
+            Vector(
+              // big part comes before the one we are interested in
+              Multipart.FormData.BodyPart(
+                "field2",
+                HttpEntity.IndefiniteLength(ContentTypes.`application/octet-stream`, firstSource)
+              ),
+              Multipart.FormData.BodyPart.Strict(
+                "field1",
+                HttpEntity(str1),
+                Map("filename" → "data1.txt")
+              )
+            )
+          )
+        )
+
+      Post("/", multipartForm) ~> route ~> check {
+        status shouldEqual StatusCodes.OK
+        responseAs[String] shouldEqual str1
+      }
+    }
   }
 
   "the fileUploadAll directive" should {
 
     def echoAsAService =
       extractRequestContext { ctx ⇒
-        implicit val mat = ctx.materializer
-
         fileUploadAll("field1") { files ⇒
           complete {
             Future.traverse(files) { // all the files can be processed in parallel because they are buffered on disk
@@ -313,8 +378,6 @@ class FileUploadDirectivesSpec extends RoutingSpec {
     "reject the file upload if the field name is missing" in {
       val route =
         extractRequestContext { ctx ⇒
-          implicit val mat = ctx.materializer
-
           fileUpload("missing") {
             case (info, bytes) ⇒
               // stream the bytes somewhere

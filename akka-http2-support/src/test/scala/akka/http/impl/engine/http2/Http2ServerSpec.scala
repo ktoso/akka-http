@@ -14,7 +14,7 @@ import akka.http.impl.engine.http2.Http2Protocol.{ ErrorCode, Flags, FrameType, 
 import akka.http.impl.engine.http2.framing.FrameRenderer
 import akka.http.impl.engine.server.HttpAttributes
 import akka.http.impl.engine.ws.ByteStringSinkProbe
-import akka.http.impl.util.{ StreamUtils, StringRendering, WithLogCapturing }
+import akka.http.impl.util.{ StringRendering, WithLogCapturing }
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers.{ CacheDirectives, RawHeader }
 import akka.http.scaladsl.model.http2.Http2StreamIdHeader
@@ -42,7 +42,7 @@ import FrameEvent._
 class Http2ServerSpec extends AkkaSpec("""
     akka.loglevel = debug
     akka.loggers = ["akka.http.impl.util.SilenceAllTestEventListener"]
-    
+
     akka.http.server.remote-address-header = on
   """)
   with WithInPendingUntilFixed with Eventually with WithLogCapturing {
@@ -85,7 +85,7 @@ class Http2ServerSpec extends AkkaSpec("""
         val headerBlock = hex"00 00 01 01 05 00 00 00 01 40"
         sendHEADERS(1, endStream = false, endHeaders = true, headerBlockFragment = headerBlock)
 
-        val (lastStreamId, errorCode) = expectGOAWAY(0) // since we have not processed any stream
+        val (_, errorCode) = expectGOAWAY(0) // since we have not processed any stream
         errorCode should ===(ErrorCode.COMPRESSION_ERROR)
       }
       "GOAWAY when second request on different stream has invalid headers frame" in new SimpleRequestResponseRoundtripSetup {
@@ -101,7 +101,7 @@ class Http2ServerSpec extends AkkaSpec("""
         val incorrectHeaderBlock = hex"00 00 01 01 05 00 00 00 01 40"
         sendHEADERS(3, endStream = false, endHeaders = true, headerBlockFragment = incorrectHeaderBlock)
 
-        val (lastStreamId, errorCode) = expectGOAWAY(1) // since we have sucessfully started processing stream `1`
+        val (_, errorCode) = expectGOAWAY(1) // since we have successfully started processing stream `1`
         errorCode should ===(ErrorCode.COMPRESSION_ERROR)
       }
       "Three consecutive GET requests" in new SimpleRequestResponseRoundtripSetup {
@@ -347,6 +347,37 @@ class Http2ServerSpec extends AkkaSpec("""
         sendRST_STREAM(TheStreamId, ErrorCode.CANCEL)
         entityDataOut.expectCancellation()
       }
+
+      "handle RST_STREAM while data is waiting in outgoing stream buffer" in new WaitingForResponseDataSetup {
+        val data1 = ByteString("abcd")
+        entityDataOut.sendNext(data1)
+
+        sendRST_STREAM(TheStreamId, ErrorCode.CANCEL)
+
+        entityDataOut.expectCancellation()
+        toNet.expectNoBytes() // the whole stage failed with bug #2236
+      }
+
+      "handle RST_STREAM while waiting for a window update" in new WaitingForResponseDataSetup {
+        entityDataOut.sendNext(bytes(70000, 0x23)) // 70000 > Http2Protocol.InitialWindowSize
+        sendWINDOW_UPDATE(TheStreamId, 10000) // enough window for the stream but not for the window
+
+        expectDATA(TheStreamId, false, Http2Protocol.InitialWindowSize)
+
+        // enough stream-level WINDOW, but too little connection-level WINDOW
+        expectNoBytes()
+
+        // now the demuxer is in the WaitingForConnectionWindow state, cancel the connection
+        sendRST_STREAM(TheStreamId, ErrorCode.CANCEL)
+
+        entityDataOut.expectCancellation()
+        expectNoBytes()
+
+        // now increase connection-level window again and see if everything still works
+        sendWINDOW_UPDATE(0, 10000)
+        expectNoBytes() // don't expect anything, stream has been cancelled in the meantime
+      }
+
       "cancel entity data source when peer sends RST_STREAM before entity is subscribed" in new TestSetup with RequestResponseProbes with AutomaticHpackWireSupport {
         val theRequest = HttpRequest(protocol = HttpProtocols.`HTTP/2.0`)
         sendRequest(1, theRequest)
@@ -688,7 +719,7 @@ class Http2ServerSpec extends AkkaSpec("""
         val illegalPayload = hex"cafe babe"
         sendFrame(FrameType.SETTINGS, ackFlag, 0, illegalPayload)
 
-        val (lastStreamId, error) = expectGOAWAY()
+        val (_, error) = expectGOAWAY()
         error should ===(ErrorCode.FRAME_SIZE_ERROR)
       }
       "received SETTINGs frame frame with a length other than a multiple of 6 octets (invalid 6_5)" in new TestSetup with RequestResponseProbes {
@@ -696,7 +727,7 @@ class Http2ServerSpec extends AkkaSpec("""
 
         sendFrame(FrameType.SETTINGS, ByteFlag.Zero, 0, data)
 
-        val (lastStreamId, error) = expectGOAWAY()
+        val (_, error) = expectGOAWAY()
         error should ===(ErrorCode.FRAME_SIZE_ERROR)
       }
 
@@ -765,7 +796,7 @@ class Http2ServerSpec extends AkkaSpec("""
         val invalidIdForPing = 1
         sendFrame(FrameType.PING, ByteFlag.Zero, invalidIdForPing, ByteString("abcd1234"))
 
-        val (lastStreamId, errorCode) = expectGOAWAY()
+        val (_, errorCode) = expectGOAWAY()
         errorCode should ===(ErrorCode.PROTOCOL_ERROR)
       }
       "respond to PING frames giving precedence over any other kind pending frame" in pending
@@ -818,7 +849,7 @@ class Http2ServerSpec extends AkkaSpec("""
         lazy val theAddress = "127.0.0.1"
         lazy val thePort = 1337
         override def modifyServer(server: BidiFlow[HttpResponse, ByteString, ByteString, HttpRequest, NotUsed]) =
-          BidiFlow.fromGraph(StreamUtils.fuseAggressive(server).withAttributes(
+          BidiFlow.fromGraph(server.withAttributes(
             HttpAttributes.remoteAddress(new InetSocketAddress(theAddress, thePort))
           ))
 
@@ -838,7 +869,7 @@ class Http2ServerSpec extends AkkaSpec("""
 
         lazy val expectedSession = SSLContext.getDefault.createSSLEngine.getSession
         override def modifyServer(server: BidiFlow[HttpResponse, ByteString, ByteString, HttpRequest, NotUsed]) =
-          BidiFlow.fromGraph(StreamUtils.fuseAggressive(server).withAttributes(
+          BidiFlow.fromGraph(server.withAttributes(
             HttpAttributes.tlsSessionInfo(expectedSession)
           ))
 
@@ -1025,6 +1056,7 @@ class Http2ServerSpec extends AkkaSpec("""
           if (streamId == 0) updateToServerWindowForConnection(_ + windowSizeIncrement)
           else updateToServerWindows(streamId, _ + windowSizeIncrement)
       }
+
     final def pollForWindowUpdates(duration: FiniteDuration): Unit =
       try {
         toNet.within(duration)(expectWindowUpdate())
@@ -1033,6 +1065,9 @@ class Http2ServerSpec extends AkkaSpec("""
       } catch {
         case e: AssertionError if e.getMessage contains "Expected OnNext(_), yet no element signaled during" ⇒
         // timeout, that's expected
+        case e: AssertionError if (e.getMessage contains "block took") && (e.getMessage contains "exceeding") ⇒
+          // pause like GC, poll again just to be sure
+          pollForWindowUpdates(duration)
       }
 
     // keep counters that are updated on outgoing sendDATA and incoming WINDOW_UPDATE frames

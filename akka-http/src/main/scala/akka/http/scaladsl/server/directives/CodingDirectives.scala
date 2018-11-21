@@ -6,12 +6,9 @@ package akka.http.scaladsl.server
 package directives
 
 import scala.collection.immutable
-import scala.util.control.NonFatal
 import akka.http.scaladsl.model.headers.{ HttpEncoding, HttpEncodings }
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.coding._
-import akka.stream.scaladsl.Flow
-import akka.util.ByteString
 
 /**
  * @groupname coding Coding directives
@@ -80,16 +77,7 @@ trait CodingDirectives {
       else
         extractSettings flatMap { settings ⇒
           val effectiveDecoder = decoder.withMaxBytesPerChunk(settings.decodeMaxBytesPerChunk)
-          mapRequest { request ⇒
-            effectiveDecoder.decodeMessage(request).mapEntity { entity ⇒
-              entity.transformDataBytes(Flow[ByteString].recover {
-                case NonFatal(e) ⇒
-                  throw IllegalRequestException(
-                    StatusCodes.BadRequest,
-                    ErrorInfo("The request's encoding is corrupt", e.getMessage))
-              })
-            }
-          }
+          mapRequest(effectiveDecoder.decodeMessage(_)) & withSizeLimit(settings.decodeMaxSize)
         }
 
     requestEntityEmpty | (

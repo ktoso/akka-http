@@ -19,6 +19,7 @@ import HttpEncodings._
 import HttpMethods._
 import java.net.InetAddress
 
+import akka.http.scaladsl.model.MediaType.WithOpenCharset
 import org.scalatest.exceptions.TestFailedException
 
 class HttpHeaderSpec extends FreeSpec with Matchers {
@@ -140,12 +141,12 @@ class HttpHeaderSpec extends FreeSpec with Matchers {
       "Authorization: Fancy QWxhZGRpbjpvcGVuIHNlc2FtZQ==" =!=
         Authorization(GenericHttpCredentials("Fancy", "QWxhZGRpbjpvcGVuIHNlc2FtZQ=="))
       """Authorization: Fancy yes="n:o", nonce=42""" =!=
-        Authorization(GenericHttpCredentials("Fancy", Map("yes" → "n:o", "nonce" → "42"))).renderedTo(
-          """Fancy yes="n:o",nonce=42""")
-      """Authorization: Fancy yes=no,nonce="4\\2"""" =!=
-        Authorization(GenericHttpCredentials("Fancy", Map("yes" → "no", "nonce" → """4\2""")))
-      """Authorization: Other yes=no,empty=""""" =!=
-        Authorization(GenericHttpCredentials("Other", Map("yes" → "no", "empty" → "")))
+        Authorization(GenericHttpCredentials("Fancy", Map("nonce" → "42", "yes" → "n:o"))).renderedTo(
+          """Fancy nonce=42,yes="n:o"""")
+      """Authorization: Fancy nonce="4\\2",yes=no""" =!=
+        Authorization(GenericHttpCredentials("Fancy", Map("nonce" → """4\2""", "yes" → "no")))
+      """Authorization: Other empty="",yes=no""" =!=
+        Authorization(GenericHttpCredentials("Other", Map("empty" → "", "yes" → "no")))
       "Authorization: Basic Qm9iOg==" =!=
         Authorization(BasicHttpCredentials("Bob", ""))
       """Authorization: Digest name=Bob""" =!=
@@ -190,8 +191,8 @@ class HttpHeaderSpec extends FreeSpec with Matchers {
 
     "Content-Disposition" in {
       "Content-Disposition: form-data" =!= `Content-Disposition`(ContentDispositionTypes.`form-data`)
-      "Content-Disposition: attachment; name=\"field1\"; filename=\"file/txt\"" =!=
-        `Content-Disposition`(ContentDispositionTypes.attachment, Map("name" → "field1", "filename" → "file/txt"))
+      "Content-Disposition: attachment; filename=\"file/txt\"; name=\"field1\"" =!=
+        `Content-Disposition`(ContentDispositionTypes.attachment, Map("filename" → "file/txt", "name" → "field1"))
       "Content-Disposition: attachment; name=\"field1\"; other=\"\"" =!=
         `Content-Disposition`(ContentDispositionTypes.attachment, Map("name" → "field1", "other" → ""))
     }
@@ -406,8 +407,8 @@ class HttpHeaderSpec extends FreeSpec with Matchers {
     }
 
     "Proxy-Authorization" in {
-      """Proxy-Authorization: Fancy yes=no,nonce="4\\2"""" =!=
-        `Proxy-Authorization`(GenericHttpCredentials("Fancy", Map("yes" → "no", "nonce" → """4\2""")))
+      """Proxy-Authorization: Fancy nonce="4\\2",yes=no""" =!=
+        `Proxy-Authorization`(GenericHttpCredentials("Fancy", Map("nonce" → """4\2""", "yes" → "no")))
       "Proxy-Authorization: Fancy QWxhZGRpbjpvcGVuIHNlc2FtZQ==" =!=
         `Proxy-Authorization`(GenericHttpCredentials("Fancy", "QWxhZGRpbjpvcGVuIHNlc2FtZQ=="))
     }
@@ -593,13 +594,15 @@ class HttpHeaderSpec extends FreeSpec with Matchers {
                            nonce=dcd98b7102dd2f0e8b11d0f600bfb0c093,
                            opaque=5ccc069c403ebaf9f0171e9517f40e41""".stripMarginWithNewline("\r\n") =!=
         `WWW-Authenticate`(HttpChallenge("Digest", "testrealm@host.com", Map(
-          "qop" → "auth,auth-int",
-          "nonce" → "dcd98b7102dd2f0e8b11d0f600bfb0c093", "opaque" → "5ccc069c403ebaf9f0171e9517f40e41"))).renderedTo(
-          "Digest realm=\"testrealm@host.com\",qop=\"auth,auth-int\",nonce=dcd98b7102dd2f0e8b11d0f600bfb0c093,opaque=5ccc069c403ebaf9f0171e9517f40e41")
+          "nonce" → "dcd98b7102dd2f0e8b11d0f600bfb0c093",
+          "opaque" → "5ccc069c403ebaf9f0171e9517f40e41",
+          "qop" → "auth,auth-int"
+        ))).renderedTo(
+          "Digest realm=\"testrealm@host.com\",nonce=dcd98b7102dd2f0e8b11d0f600bfb0c093,opaque=5ccc069c403ebaf9f0171e9517f40e41,qop=\"auth,auth-int\"")
       "WWW-Authenticate: Basic realm=\"WallyWorld\",attr=\"val>ue\", Fancy realm=\"yeah\"" =!=
         `WWW-Authenticate`(HttpChallenge("Basic", Some("WallyWorld"), Map("attr" → "val>ue")), HttpChallenge("Fancy", Some("yeah")))
-      "WWW-Authenticate: Basic attr=value,another=\"val>ue\"" =!=
-        `WWW-Authenticate`(HttpChallenge("Basic", None, Map("attr" → "value", "another" → "val>ue")))
+      "WWW-Authenticate: Basic another=\"val>ue\",attr=value" =!=
+        `WWW-Authenticate`(HttpChallenge("Basic", None, Map("another" → "val>ue", "attr" → "value")))
       "WWW-Authenticate: Basic attr=value" =!=
         `WWW-Authenticate`(HttpChallenge("Basic", None, Map("attr" → "value")))
       """WWW-Authenticate: Fancy realm="Secure Area",nonce=42""" =!=
@@ -729,6 +732,25 @@ class HttpHeaderSpec extends FreeSpec with Matchers {
       val targetUri = Uri("http://example.org/?abc=def=ghi", Uri.ParsingMode.Relaxed)
       HttpHeader.parse("location", "http://example.org/?abc=def=ghi", HeaderParser.Settings(uriParsingMode = Uri.ParsingMode.Relaxed)) shouldEqual
         ParsingResult.Ok(Location(targetUri), Nil)
+    }
+    "parse content-type with custom media types" in {
+      // Override the application/json media type and give it an open instead of fixed charset.
+      // This allows us to support various third-party agents which use an explicit charset.
+      val openJson: WithOpenCharset = MediaType.customWithOpenCharset("application", "json")
+
+      def checkContentType(headerValue: String, contentType: ContentType) = {
+        val customMediaTypes: MediaTypes.FindCustom = {
+          case ("application", "json") ⇒ Some(openJson)
+          case _                       ⇒ None
+        }
+        val headerParserSettings = HeaderParser.Settings(customMediaTypes = customMediaTypes)
+        val header = `Content-Type`(contentType)
+        HttpHeader.parse("content-type", headerValue, headerParserSettings) shouldEqual ParsingResult.Ok(header, Nil)
+        header.toString shouldEqual s"Content-Type: $headerValue"
+      }
+
+      checkContentType("application/json", ContentType.WithMissingCharset(openJson))
+      checkContentType("application/json; charset=UTF-8", ContentType(openJson, HttpCharsets.`UTF-8`))
     }
   }
 

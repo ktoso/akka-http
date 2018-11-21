@@ -50,6 +50,7 @@ as required, optional, or repeated, or to filter requests where a parameter has 
 
 `"amount".as(deserializer)`
 : extract value of parameter "amount" with an explicit @unidoc[Unmarshaller]
+
 `"distance".*`
 : extract multiple occurrences of parameter "distance" as `Iterable[String]`
 
@@ -110,11 +111,15 @@ Java
 
 @@snip [ParameterDirectivesExamplesSpec.scala]($test$/scala/docs/http/scaladsl/server/directives/ParameterDirectivesExamplesSpec.scala) { #optional-with-default }
 
+@@@
+
 ### Parameter with required value
 
-@@snip [ParameterDirectivesExamplesSpec.scala]($test$/scala/docs/http/scaladsl/server/directives/ParameterDirectivesExamplesSpec.scala) { #required-value }
+Scala
+:   @@snip [ParameterDirectivesExamplesSpec.scala]($test$/scala/docs/http/scaladsl/server/directives/ParameterDirectivesExamplesSpec.scala) { #required-value }
 
-@@@
+Java
+:   @@snip [ParameterDirectivesExamplesTest.java]($test$/java/docs/http/javadsl/server/directives/ParameterDirectivesExamplesTest.java) { #required-value }
 
 ### Deserialized parameter
 

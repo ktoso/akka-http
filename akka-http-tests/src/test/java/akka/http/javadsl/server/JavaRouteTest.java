@@ -29,6 +29,8 @@ import akka.http.scaladsl.model.headers.CustomHeader;
 import akka.japi.pf.PFBuilder;
 import akka.util.ByteString;
 
+import static akka.http.javadsl.server.Directives.*;
+
 public class JavaRouteTest extends JUnitRouteTest {
   private final Route route = getRoute();
   private static final Unmarshaller<String, BigDecimal> BIG_DECIMAL_PARAM =
@@ -268,7 +270,7 @@ public class JavaRouteTest extends JUnitRouteTest {
 
 
   public Route getRoute() {
-    return route(
+    return concat(
       path(segment("hello").slash("world"), () ->
         complete("hello, world")
       ),
@@ -313,7 +315,7 @@ public class JavaRouteTest extends JUnitRouteTest {
           complete("body " + value)
         )
       ),
-      path("uuid", () -> route(
+      path("uuid", () -> concat(
         put(() ->
           entity(UUID_FROM_BODY, value ->
             complete("uuid " + value)

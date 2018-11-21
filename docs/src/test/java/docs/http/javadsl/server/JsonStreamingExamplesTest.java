@@ -24,14 +24,31 @@ import org.junit.Test;
 
 import java.util.concurrent.CompletionStage;
 
+//#response-streaming
+import static akka.http.javadsl.server.Directives.completeOKWithSource;
+import static akka.http.javadsl.server.Directives.get;
+import static akka.http.javadsl.server.Directives.parameter;
+import static akka.http.javadsl.server.Directives.path;
+
+//#response-streaming
+//#incoming-request-streaming
+import static akka.http.javadsl.server.Directives.complete;
+import static akka.http.javadsl.server.Directives.entityAsSourceOf;
+import static akka.http.javadsl.server.Directives.extractMaterializer;
+import static akka.http.javadsl.server.Directives.onComplete;
+import static akka.http.javadsl.server.Directives.post;
+
+//#incoming-request-streaming
+//#csv-example
+import static akka.http.javadsl.server.Directives.get;
+import static akka.http.javadsl.server.Directives.path;
+import static akka.http.javadsl.server.Directives.completeWithSource;
+
+//#csv-example
 public class JsonStreamingExamplesTest extends JUnitRouteTest {
 
   //#routes
   final Route tweets() {
-    //#formats
-    final Unmarshaller<ByteString, JavaTweet> JavaTweets = Jackson.byteStringUnmarshaller(JavaTweet.class);
-    //#formats
-
     //#response-streaming
 
     // Step 1: Enable JSON streaming
@@ -63,16 +80,23 @@ public class JsonStreamingExamplesTest extends JUnitRouteTest {
       )
     );
     //#response-streaming
+    return responseStreaming;
+  }
+
+  final Route measurements() {
+    //#measurement-format
+    final Unmarshaller<ByteString, Measurement> Measurements = Jackson.byteStringUnmarshaller(Measurement.class);
+    //#measurement-format
 
     //#incoming-request-streaming
-    final Route incomingStreaming = path("tweets", () ->
+    final Route incomingStreaming = path("metrics", () ->
       post(() ->
         extractMaterializer(mat -> {
-          final JsonEntityStreamingSupport jsonSupport = EntityStreamingSupport.json();
+            final JsonEntityStreamingSupport jsonSupport = EntityStreamingSupport.json();
 
-          return entityAsSourceOf(JavaTweets, jsonSupport, sourceOfTweets -> {
-              final CompletionStage<Integer> tweetsCount = sourceOfTweets.runFold(0, (acc, tweet) -> acc + 1, mat);
-              return onComplete(tweetsCount, c -> complete("Total number of tweets: " + c));
+            return entityAsSourceOf(Measurements, jsonSupport, sourceOfMeasurements -> {
+              final CompletionStage<Integer> measurementCount = sourceOfMeasurements.runFold(0, (acc, measurement) -> acc + 1, mat);
+              return onComplete(measurementCount, c -> complete("Total number of measurements: " + c));
             });
           }
         )
@@ -80,7 +104,7 @@ public class JsonStreamingExamplesTest extends JUnitRouteTest {
     );
     //#incoming-request-streaming
 
-    return responseStreaming.orElse(incomingStreaming);
+    return incomingStreaming;
   }
 
   final Route csvTweets() {
@@ -160,7 +184,7 @@ public class JsonStreamingExamplesTest extends JUnitRouteTest {
     routes.run(HttpRequest.GET("/tweets?n=2").addHeader(acceptCsv))
       .assertStatusCode(200)
       .assertEntity("12,Hello World!\n" +
-        "12,Hello World!");
+        "12,Hello World!\n");
 
     // test responses to potential errors
     final Accept acceptText = Accept.create(MediaRanges.ALL_APPLICATION);
@@ -170,7 +194,7 @@ public class JsonStreamingExamplesTest extends JUnitRouteTest {
     //#response-streaming
   }
 
-  //#models
+  //#tweet-model
   private static final class JavaTweet {
     private int id;
     private String message;
@@ -195,7 +219,35 @@ public class JsonStreamingExamplesTest extends JUnitRouteTest {
     public String getMessage() {
       return message;
     }
-
   }
-  //#models
+  //#tweet-model
+
+  //#measurement-model
+  private static final class Measurement {
+    private String id;
+    private int value;
+
+    public Measurement(String id, int value) {
+      this.id = id;
+      this.value = value;
+    }
+
+    public String getId() {
+      return id;
+    }
+
+    public void setId(String id) {
+      this.id = id;
+    }
+
+    public void setValue(int value) {
+      this.value = value;
+    }
+
+    public int getValue() {
+      return value;
+    }
+  }
+  
+  //#measurement-model
 }

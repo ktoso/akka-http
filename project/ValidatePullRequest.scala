@@ -6,8 +6,7 @@ package akka
 
 import java.io._
 
-import akka.MimaWithPrValidation.MimaResult
-import akka.MimaWithPrValidation.Problems
+import akka.MimaWithPrValidation.{MimaResult, NoErrors, Problems}
 import net.virtualvoid.sbt.graph.ModuleGraph
 import net.virtualvoid.sbt.graph.backend.SbtUpdateReport
 import org.kohsuke.github.GHIssueComment
@@ -50,7 +49,7 @@ object ValidatePullRequest extends AutoPlugin {
   case object BuildQuick extends BuildMode {
     override def task = Some(executeTests in ValidatePR)
     def log(projectName: String, l: Logger) =
-      l.info(s"Building [$projectName] in quick mode, as it's dependencies were affected by PR.")
+      l.info(s"Building [$projectName] in quick mode, as its dependencies were affected by PR.")
   }
 
   case object BuildProjectChangedQuick extends BuildMode {
@@ -192,7 +191,7 @@ object ValidatePullRequest extends AutoPlugin {
             .map(_.takeWhile(_ != '/'))
             .filter(dir => dir.startsWith("akka-") || dir.startsWith("docs") || BuildFilesAndDirectories.contains(dir))
             .toSet
-          log.info("Detected uncomitted changes in directories (including in dependency analysis): " + dirtyDirectories.mkString("[", ",", "]"))
+          log.info("Detected uncommitted changes in directories (including in dependency analysis): " + dirtyDirectories.mkString("[", ",", "]"))
           dirtyDirectories
         }
 
@@ -368,7 +367,7 @@ object AggregatePRValidation extends AutoPlugin {
       write("# Pull request validation report")
       write("")
 
-      def showKey(key: ScopedKey[_]): String = Project.showContextKey(extracted.session, extracted.structure).show(key)//Project.showContextKey(newState).show(key)
+      def showKey(key: ScopedKey[_]): String = Project.showContextKey2(extracted.session).show(key)
 
       def totalCount(suiteResult: SuiteResult): Int = {
         import suiteResult._
@@ -413,6 +412,7 @@ object AggregatePRValidation extends AutoPlugin {
           case KeyValue(key, Problems(desc)) =>
             write(s"Problems for ${key.scope.project.toOption.get.asInstanceOf[ProjectRef].project}:\n$desc")
             write("")
+          case KeyValue(_, NoErrors) =>
         }
         write("```")
         write("")
@@ -557,7 +557,7 @@ object MimaWithPrValidation extends AutoPlugin {
               mimaCurrentClassfiles.value,
               (fullClasspath in mimaFindBinaryIssues).value,
               mimaCheckDirection.value,
-              streams.value
+              new SbtLogger(streams.value)
             )
 
             val binary = mimaBinaryIssueFilters.value

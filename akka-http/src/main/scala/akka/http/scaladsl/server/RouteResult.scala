@@ -27,16 +27,18 @@ object RouteResult {
     override def getResponse = response
   }
   final case class Rejected(rejections: immutable.Seq[Rejection]) extends javadsl.server.Rejected with RouteResult {
-    override def getRejections = rejections.map(r ⇒ r: javadsl.server.Rejection).toIterable.asJava
+    override def getRejections = rejections.map(r ⇒ r: javadsl.server.Rejection).asJava
   }
 
-  implicit def route2HandlerFlow(route: Route)(implicit
-    routingSettings: RoutingSettings,
-                                               parserSettings:   ParserSettings,
-                                               materializer:     Materializer,
-                                               routingLog:       RoutingLog,
-                                               executionContext: ExecutionContext = null,
-                                               rejectionHandler: RejectionHandler = RejectionHandler.default,
-                                               exceptionHandler: ExceptionHandler = null): Flow[HttpRequest, HttpResponse, NotUsed] =
+  implicit def route2HandlerFlow(route: Route)(
+    implicit
+    routingSettings:  RoutingSettings,
+    parserSettings:   ParserSettings,
+    materializer:     Materializer,
+    routingLog:       RoutingLog,
+    executionContext: ExecutionContext = null,
+    rejectionHandler: RejectionHandler = RejectionHandler.default,
+    exceptionHandler: ExceptionHandler = null
+  ): Flow[HttpRequest, HttpResponse, NotUsed] =
     Route.handlerFlow(route)
 }

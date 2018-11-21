@@ -23,7 +23,7 @@ handle any exception.
 So, if you'd like to customize the way certain exceptions are handled you need to write a custom @unidoc[ExceptionHandler].
 Once you have defined your custom @unidoc[ExceptionHandler] you have two options for "activating" it:
 
- 1. @scala[Bring it into implicit scope at the top-level.]@java[Pass it to the `seal()` method of the @unidoc[Route] class.]
+ 1. @scala[Bring it into implicit scope at the top-level.]@java[Pass it to the `seal()` method of the @scala[@scaladoc[Route](akka.http.scaladsl.server.index#Route=akka.http.scaladsl.server.RequestContext=%3Escala.concurrent.Future[akka.http.scaladsl.server.RouteResult])]@java[@unidoc[Route]] class.]
  2. Supply it as argument to the @ref[handleExceptions](directives/execution-directives/handleExceptions.md) directive.
 
 In the first case your handler will be "sealed" (which means that it will receive the default handler as a fallback for
@@ -77,6 +77,13 @@ reaching the exception handler.
 
 To understand the performance implications of (mis-)using exceptions,
 have a read at this excellent post by A. Shipilёv: [The Exceptional Performance of Lil' Exception](https://shipilev.net/blog/2014/exceptional-performance).
+@@@
+
+
+@@@ note
+Please note that since version `10.1.6`, the default `ExceptionHandler` will also discard the entity bytes automatically. If you want to change this behavior,
+please refer to @ref[the section above](exception-handling.md#exception-handling); however, might cause connections to stall
+if the entity is not properly rejected or cancelled on the client side.
 @@@
 
 ## Respond with headers and Exception Handler

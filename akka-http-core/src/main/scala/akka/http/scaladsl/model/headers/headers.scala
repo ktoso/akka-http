@@ -668,6 +668,8 @@ final case class Range(rangeUnit: RangeUnit, ranges: immutable.Seq[ByteRange]) e
 }
 
 final case class RawHeader(name: String, value: String) extends jm.headers.RawHeader {
+  if (name == null) throw new IllegalArgumentException("name must not be null")
+  if (value == null) throw new IllegalArgumentException("value must not be null")
   def renderInRequests = true
   def renderInResponses = true
   val lowercaseName = name.toRootLowerCase
@@ -864,6 +866,18 @@ final case class Server(products: immutable.Seq[ProductVersion]) extends jm.head
 // https://tools.ietf.org/html/rfc6797
 object `Strict-Transport-Security` extends ModeledCompanion[`Strict-Transport-Security`] {
   def apply(maxAge: Long, includeSubDomains: Option[Boolean]) = new `Strict-Transport-Security`(maxAge, includeSubDomains.getOrElse(false))
+
+  private val maxAges: PartialFunction[StrictTransportSecurityDirective, MaxAge] = { case m: MaxAge ⇒ m }
+  private val isIncludeSubDomains: StrictTransportSecurityDirective ⇒ Boolean = { _ eq IncludeSubDomains }
+  def fromDirectives(directives: StrictTransportSecurityDirective*) = {
+    val maxAgeDirectives = directives.collect(maxAges)
+    if (maxAgeDirectives.size != 1) throw new IllegalArgumentException("exactly one 'max-age' directive required")
+
+    val includeSubDomainsDirectivesCount = directives.count(isIncludeSubDomains)
+    if (includeSubDomainsDirectivesCount > 1) throw new IllegalArgumentException("at most one 'includeSubDomains' directive allowed")
+
+    new `Strict-Transport-Security`(maxAgeDirectives.head.value, includeSubDomainsDirectivesCount == 1)
+  }
 }
 final case class `Strict-Transport-Security`(maxAge: Long, includeSubDomains: Boolean = false) extends jm.headers.StrictTransportSecurity with ResponseHeader {
   def renderValue[R <: Rendering](r: R): r.type = {

@@ -95,6 +95,10 @@ sealed trait HttpMessage extends jm.HttpMessage {
   def toStrict(timeout: FiniteDuration)(implicit ec: ExecutionContext, fm: Materializer): Future[Self] =
     entity.toStrict(timeout).fast.map(this.withEntity)
 
+  /** Returns a shareable and serializable copy of this message with a strict entity. */
+  def toStrict(timeout: FiniteDuration, maxBytes: Long)(implicit ec: ExecutionContext, fm: Materializer): Future[Self] =
+    entity.toStrict(timeout, maxBytes).fast.map(this.withEntity)
+
   /** Returns a copy of this message with the entity and headers set to the given ones. */
   def withHeadersAndEntity(headers: immutable.Seq[HttpHeader], entity: MessageEntity): Self
 
@@ -185,6 +189,11 @@ sealed trait HttpMessage extends jm.HttpMessage {
     val ex = ExecutionContext.fromExecutor(ec)
     toStrict(timeoutMillis.millis)(ex, materializer).toJava
   }
+  /** Java API */
+  def toStrict(timeoutMillis: Long, maxBytes: Long, ec: Executor, materializer: Materializer): CompletionStage[Self] = {
+    val ex = ExecutionContext.fromExecutor(ec)
+    toStrict(timeoutMillis.millis, maxBytes)(ex, materializer).toJava
+  }
 }
 
 object HttpMessage {
@@ -253,7 +262,7 @@ final class HttpRequest(
   HttpRequest.verifyUri(uri)
   require(entity.isKnownEmpty || method.isEntityAccepted, s"Requests with method '${method.value}' must have an empty entity")
   require(
-    protocol != HttpProtocols.`HTTP/1.0` || !entity.isInstanceOf[HttpEntity.Chunked],
+    protocol != HttpProtocols.`HTTP/1.0` || !entity.isChunked,
     "HTTP/1.0 requests must not have a chunked entity")
 
   type Self = HttpRequest
@@ -434,7 +443,7 @@ final class HttpResponse(
 
   require(entity.isKnownEmpty || status.allowsEntity, "Responses with this status code must have an empty entity")
   require(
-    protocol == HttpProtocols.`HTTP/1.1` || !entity.isInstanceOf[HttpEntity.Chunked],
+    protocol != HttpProtocols.`HTTP/1.0` || !entity.isChunked,
     "HTTP/1.0 responses must not have a chunked entity")
 
   type Self = HttpResponse

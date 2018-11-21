@@ -4,13 +4,14 @@
 
 package akka.http.javadsl
 
-import java.util.{ Collection ⇒ JCollection, Optional }
-import javax.net.ssl.{ SSLContext, SSLParameters }
+import java.util.{ Optional, Collection ⇒ JCollection }
+
+import akka.annotation.DoNotInherit
 import akka.http.scaladsl
 import akka.japi.Util
 import akka.stream.TLSClientAuth
-import akka.http.impl.util.JavaMapping.Implicits._
 import com.typesafe.sslconfig.akka.AkkaSSLConfig
+import javax.net.ssl.{ SSLContext, SSLParameters }
 
 import scala.compat.java8.OptionConverters
 
@@ -18,8 +19,10 @@ object ConnectionContext {
   //#https-context-creation
   // ConnectionContext
   /** Used to serve HTTPS traffic. */
-  def https(sslContext: SSLContext): HttpsConnectionContext =
+  def https(sslContext: SSLContext): HttpsConnectionContext = // ...
+    //#https-context-creation
     scaladsl.ConnectionContext.https(sslContext)
+  //#https-context-creation
 
   /** Used to serve HTTPS traffic. */
   def https(
@@ -28,7 +31,8 @@ object ConnectionContext {
     enabledCipherSuites: Optional[JCollection[String]],
     enabledProtocols:    Optional[JCollection[String]],
     clientAuth:          Optional[TLSClientAuth],
-    sslParameters:       Optional[SSLParameters]) =
+    sslParameters:       Optional[SSLParameters]) = // ...
+    //#https-context-creation
     scaladsl.ConnectionContext.https(
       sslContext,
       OptionConverters.toScala(sslConfig),
@@ -36,7 +40,6 @@ object ConnectionContext {
       OptionConverters.toScala(enabledProtocols).map(Util.immutableSeq(_)),
       OptionConverters.toScala(clientAuth),
       OptionConverters.toScala(sslParameters))
-  //#https-context-creation
 
   /** Used to serve HTTPS traffic. */
   // for binary-compatibility, since 2.4.7
@@ -58,23 +61,33 @@ object ConnectionContext {
     scaladsl.ConnectionContext.noEncryption()
 }
 
+@DoNotInherit
 abstract class ConnectionContext {
   def isSecure: Boolean
   def sslConfig: Option[AkkaSSLConfig]
+  def http2: UseHttp2
+
+  def withHttp2(newValue: UseHttp2): ConnectionContext
 
   @deprecated("'default-http-port' and 'default-https-port' configuration properties are used instead", since = "10.0.11")
   def getDefaultPort: Int
 }
 
-abstract class HttpConnectionContext extends akka.http.javadsl.ConnectionContext {
+@DoNotInherit
+abstract class HttpConnectionContext(override val http2: UseHttp2) extends akka.http.javadsl.ConnectionContext {
   override final def isSecure = false
   override final def getDefaultPort = 80
   override def sslConfig: Option[AkkaSSLConfig] = None
+
+  override def withHttp2(newValue: UseHttp2): HttpConnectionContext
 }
 
-abstract class HttpsConnectionContext extends akka.http.javadsl.ConnectionContext {
+@DoNotInherit
+abstract class HttpsConnectionContext(override val http2: UseHttp2) extends akka.http.javadsl.ConnectionContext {
   override final def isSecure = true
   override final def getDefaultPort = 443
+
+  override def withHttp2(newValue: UseHttp2): HttpsConnectionContext
 
   /** Java API */
   def getEnabledCipherSuites: Optional[JCollection[String]]
